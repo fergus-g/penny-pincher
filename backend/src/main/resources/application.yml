@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: backend
+  datasource:
+    url: jdbc:mysql://localhost:3306/penny_pincher
+    username: penny
+    password: penny
+  jpa:
+    hibernate:
+      ddl-auto: validate
