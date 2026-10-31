@@ -4,8 +4,10 @@ import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class EntryService {
@@ -24,6 +26,22 @@ public class EntryService {
 		return EntryResponse.from(this.entryRepository.save(entry));
 	}
 
+	@Transactional
+	public EntryResponse update(Long id, UpdateEntryRequest request) {
+		Entry entry = findEntry(id);
+		entry.setType(request.type());
+		entry.setCategory(request.category());
+		entry.setName(request.name());
+		entry.setAmount(request.amount());
+		entry.setEndMonth(request.oneOff() ? entry.getStartMonth() : null);
+		return EntryResponse.from(entry);
+	}
+
+	@Transactional
+	public void delete(Long id) {
+		this.entryRepository.delete(findEntry(id));
+	}
+
 	@Transactional(readOnly = true)
 	public MonthSummaryResponse getMonth(YearMonth month) {
 		List<Entry> entries = this.entryRepository.findActiveIn(month);
@@ -31,6 +49,11 @@ public class EntryService {
 		BigDecimal totalExpenses = total(entries, EntryType.EXPENSE);
 		return new MonthSummaryResponse(month, entries.stream().map(EntryResponse::from).toList(), totalIncome,
 				totalExpenses, totalIncome.subtract(totalExpenses));
+	}
+
+	private Entry findEntry(Long id) {
+		return this.entryRepository.findById(id)
+			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Entry " + id + " not found"));
 	}
 
 	private static BigDecimal total(List<Entry> entries, EntryType type) {

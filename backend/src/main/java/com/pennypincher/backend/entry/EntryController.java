@@ -5,9 +5,11 @@ import java.time.YearMonth;
 import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -25,6 +27,17 @@ public class EntryController {
 	@ResponseStatus(HttpStatus.CREATED)
 	public EntryResponse create(@Valid @RequestBody CreateEntryRequest request) {
 		return this.entryService.create(request);
+	}
+
+	@PutMapping("/api/entries/{id}")
+	public EntryResponse update(@PathVariable Long id, @Valid @RequestBody UpdateEntryRequest request) {
+		return this.entryService.update(id, request);
+	}
+
+	@DeleteMapping("/api/entries/{id}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void delete(@PathVariable Long id) {
+		this.entryService.delete(id);
 	}
 
 	@GetMapping("/api/months/{month}")
