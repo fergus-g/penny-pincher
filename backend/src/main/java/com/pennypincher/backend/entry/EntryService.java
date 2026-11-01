@@ -35,18 +35,22 @@ public class EntryService {
 	@Transactional
 	public EntryResponse create(CreateEntryRequest request) {
 		requireValidAccount(request.type(), request.account());
+		requireExpenseOnly(request.type(), request.dueDay(), "a Due Day");
 		requireValidPot(request.type(), request.potId());
 		YearMonth endMonth = request.oneOff() ? request.startMonth() : null;
 		Entry entry = new Entry(request.type(), request.category(), request.name(), request.amount(),
 				request.account(), request.startMonth(), endMonth);
 		entry.setPotId(request.potId());
-		return EntryResponse.from(this.entryRepository.save(entry));
+		entry.setDueDay(request.dueDay());
+		Entry saved = this.entryRepository.save(entry);
+		return EntryResponse.from(saved, saved.getStartMonth());
 	}
 
 	@Transactional
 	public EntryResponse update(Long id, UpdateEntryRequest request) {
 		Entry entry = findEntry(id);
 		requireValidAccount(entry.getType(), request.account());
+		requireExpenseOnly(entry.getType(), request.dueDay(), "a Due Day");
 		requireValidPot(entry.getType(), request.potId());
 		entry.setCategory(request.category());
 		entry.setName(request.name());
@@ -54,7 +58,8 @@ public class EntryService {
 		entry.setAccount(request.account());
 		entry.setEndMonth(request.oneOff() ? entry.getStartMonth() : null);
 		entry.setPotId(request.potId());
-		return EntryResponse.from(entry);
+		entry.setDueDay(request.dueDay());
+		return EntryResponse.from(entry, entry.getStartMonth());
 	}
 
 	/** An Expense is paid out of an Account; Income lands outside the app, so it has none. */
@@ -64,6 +69,12 @@ public class EntryService {
 		}
 		if (type == EntryType.INCOME && account != null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Income has no Account");
+		}
+	}
+
+	private static void requireExpenseOnly(EntryType type, Object value, String what) {
+		if (type == EntryType.INCOME && value != null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Income can't have " + what);
 		}
 	}
 
@@ -89,7 +100,7 @@ public class EntryService {
 		BigDecimal totalIncome = total(entries, EntryType.INCOME);
 		BigDecimal totalExpenses = total(entries, EntryType.EXPENSE);
 		PotMonth pots = this.potService.monthOf(month);
-		return new MonthSummaryResponse(month, entries.stream().map(EntryResponse::from).toList(), totalIncome,
+		return new MonthSummaryResponse(month, entries.stream().map((entry) -> EntryResponse.from(entry, month)).toList(), totalIncome,
 				totalExpenses, totalIncome.subtract(totalExpenses), transfers(entries),
 				expensesByCategory(entries), pots.pots(), pots.allocation());
 	}

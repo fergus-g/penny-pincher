@@ -4,6 +4,10 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.YearMonth;
 
+/**
+ * An Entry as the API returns it. {@code dueDayInMonth} is the Due Day as it falls in the month
+ * being returned (the Entry's start month after a create or update): never past the month's end.
+ */
 public record EntryResponse(
 		Long id,
 		EntryType type,
@@ -14,12 +18,15 @@ public record EntryResponse(
 		YearMonth startMonth,
 		YearMonth endMonth,
 		Long potId,
+		Integer dueDay,
+		Integer dueDayInMonth,
 		Instant createdAt) {
 
-	static EntryResponse from(Entry entry) {
+	/** The Entry as it stands in {@code month}, which decides where its Due Day falls. */
+	static EntryResponse from(Entry entry, YearMonth month) {
 		return new EntryResponse(entry.getId(), entry.getType(), entry.getCategory(), entry.getName(),
 				entry.getAmount(), entry.getAccount(), entry.getStartMonth(), entry.getEndMonth(), entry.getPotId(),
-				entry.getCreatedAt());
+				entry.getDueDay(), entry.dueDayIn(month), entry.getCreatedAt());
 	}
 
 }

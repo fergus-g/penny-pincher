@@ -10,3 +10,12 @@ export function toDate(month: string): Date {
 export function monthLabel(month: string, length: 'long' | 'short' = 'long'): string {
   return toDate(month).toLocaleString('en', { month: length, year: 'numeric' });
 }
+
+/** "1st", "2nd", "3rd", "11th", "22nd" and so on. */
+export function ordinal(day: number): string {
+  const teens = day % 100 >= 11 && day % 100 <= 13;
+  const suffix = teens
+    ? 'th'
+    : (({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[day % 10] ?? 'th');
+  return `${day}${suffix}`;
+}

@@ -14,6 +14,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "entries")
@@ -49,6 +51,11 @@ public class Entry {
 	@Column(name = "end_month")
 	private YearMonth endMonth;
 
+	/** The day of the month this Expense goes out, 1 to 31; null if not set, and always for Income. */
+	@Column(name = "due_day")
+	@JdbcTypeCode(SqlTypes.TINYINT)
+	private Integer dueDay;
+
 	/** The Pot this Expense is a Contribution to; null for most Entries, and always for Income. */
 	@Column(name = "pot_id")
 	private Long potId;
@@ -74,6 +81,14 @@ public class Entry {
 	/** Started by this month and not ended before it. */
 	public boolean isActiveIn(YearMonth month) {
 		return !this.startMonth.isAfter(month) && (this.endMonth == null || !this.endMonth.isBefore(month));
+	}
+
+	/**
+	 * The Due Day as it falls in {@code month}: a day past the end of a shorter month falls on its
+	 * last day, so the 31st is the 30th in November. Null with no Due Day.
+	 */
+	public Integer dueDayIn(YearMonth month) {
+		return (this.dueDay != null) ? Math.min(this.dueDay, month.lengthOfMonth()) : null;
 	}
 
 	public Long getId() {
@@ -130,6 +145,14 @@ public class Entry {
 
 	public void setEndMonth(YearMonth endMonth) {
 		this.endMonth = endMonth;
+	}
+
+	public Integer getDueDay() {
+		return this.dueDay;
+	}
+
+	public void setDueDay(Integer dueDay) {
+		this.dueDay = dueDay;
 	}
 
 	public Long getPotId() {

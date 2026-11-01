@@ -63,7 +63,7 @@ class EntryServiceTest {
 	void createExpenseCanPayIntoAnExistingPot() {
 		given(this.entryRepository.save(any(Entry.class))).willAnswer((invocation) -> invocation.getArgument(0));
 		EntryResponse response = this.entryService.create(new CreateEntryRequest(EntryType.EXPENSE, "Loans", null,
-				new BigDecimal("250.00"), Account.AIB, OCT, false, 7L));
+				new BigDecimal("250.00"), Account.AIB, OCT, false, 7L, null));
 		verify(this.potService).requireExists(7L);
 		assertThat(response.potId()).isEqualTo(7L);
 	}
@@ -71,7 +71,7 @@ class EntryServiceTest {
 	@Test
 	void incomeCannotPayIntoAPot() {
 		CreateEntryRequest request = new CreateEntryRequest(EntryType.INCOME, "Salary", null, BigDecimal.TEN, null,
-				OCT, false, 7L);
+				OCT, false, 7L, null);
 		assertBadRequest(() -> this.entryService.create(request));
 	}
 
@@ -81,7 +81,7 @@ class EntryServiceTest {
 		entry.setPotId(7L);
 		given(this.entryRepository.findById(1L)).willReturn(Optional.of(entry));
 		EntryResponse response = this.entryService.update(1L,
-				new UpdateEntryRequest("Loans", null, new BigDecimal("250.00"), Account.AIB, false, null));
+				new UpdateEntryRequest("Loans", null, new BigDecimal("250.00"), Account.AIB, false, null, null));
 		assertThat(response.potId()).isNull();
 	}
 
@@ -148,14 +148,14 @@ class EntryServiceTest {
 	@Test
 	void incomeCannotHaveAnAccount() {
 		CreateEntryRequest request = new CreateEntryRequest(EntryType.INCOME, "Salary", null, BigDecimal.TEN,
-				Account.AIB, OCT, false, null);
+				Account.AIB, OCT, false, null, null);
 		assertBadRequest(() -> this.entryService.create(request));
 	}
 
 	@Test
 	void anExpenseNeedsAnAccount() {
 		CreateEntryRequest request = new CreateEntryRequest(EntryType.EXPENSE, "Rent", null, BigDecimal.TEN, null,
-				OCT, false, null);
+				OCT, false, null, null);
 		assertBadRequest(() -> this.entryService.create(request));
 	}
 
@@ -163,8 +163,44 @@ class EntryServiceTest {
 	void incomeIsCreatedWithoutAnAccount() {
 		given(this.entryRepository.save(any(Entry.class))).willAnswer((invocation) -> invocation.getArgument(0));
 		EntryResponse response = this.entryService.create(new CreateEntryRequest(EntryType.INCOME, "Salary", null,
-				BigDecimal.TEN, null, OCT, false, null));
+				BigDecimal.TEN, null, OCT, false, null, null));
 		assertThat(response.account()).isNull();
+	}
+
+	@Test
+	void incomeCannotHaveADueDay() {
+		CreateEntryRequest request = new CreateEntryRequest(EntryType.INCOME, "Salary", null, BigDecimal.TEN, null,
+				OCT, false, null, 25);
+		assertBadRequest(() -> this.entryService.create(request));
+	}
+
+	@Test
+	void anExpensesDueDayCanBeSetAndCleared() {
+		given(this.entryRepository.save(any(Entry.class))).willAnswer((invocation) -> invocation.getArgument(0));
+		EntryResponse created = this.entryService.create(new CreateEntryRequest(EntryType.EXPENSE, "Housing", "Rent",
+				BigDecimal.TEN, Account.AIB, OCT, false, null, 31));
+		assertThat(created.dueDay()).isEqualTo(31);
+		assertThat(created.dueDayInMonth()).isEqualTo(31);
+
+		Entry entry = entry(EntryType.EXPENSE, "10.00");
+		entry.setDueDay(31);
+		given(this.entryRepository.findById(1L)).willReturn(Optional.of(entry));
+		EntryResponse cleared = this.entryService.update(1L,
+				new UpdateEntryRequest("Housing", "Rent", BigDecimal.TEN, Account.AIB, false, null, null));
+		assertThat(cleared.dueDay()).isNull();
+		assertThat(cleared.dueDayInMonth()).isNull();
+	}
+
+	@Test
+	void theMonthSummaryGivesEachExpenseItsDueDayInThatMonth() {
+		Entry rent = entry(EntryType.EXPENSE, "1000.00");
+		rent.setDueDay(31);
+		YearMonth november = YearMonth.of(2026, 11);
+		given(this.entryRepository.findActiveIn(november)).willReturn(List.of(rent));
+		assertThat(this.entryService.getMonth(november).entries()).singleElement().satisfies((response) -> {
+			assertThat(response.dueDay()).isEqualTo(31);
+			assertThat(response.dueDayInMonth()).isEqualTo(30);
+		});
 	}
 
 	@Test
@@ -172,7 +208,7 @@ class EntryServiceTest {
 		Entry entry = entry(EntryType.EXPENSE, "1000.00");
 		given(this.entryRepository.findById(1L)).willReturn(Optional.of(entry));
 		EntryResponse response = this.entryService.update(1L,
-				new UpdateEntryRequest("Housing", "Rent", new BigDecimal("1100.00"), Account.REVOLUT, true, null));
+				new UpdateEntryRequest("Housing", "Rent", new BigDecimal("1100.00"), Account.REVOLUT, true, null, null));
 		assertThat(response.type()).isEqualTo(EntryType.EXPENSE);
 		assertThat(response.category()).isEqualTo("Housing");
 		assertThat(response.name()).isEqualTo("Rent");
@@ -186,14 +222,14 @@ class EntryServiceTest {
 		Entry entry = new Entry(EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), Account.AIB, OCT, OCT);
 		given(this.entryRepository.findById(1L)).willReturn(Optional.of(entry));
 		EntryResponse response = this.entryService.update(1L,
-				new UpdateEntryRequest("Tech", "Laptop", new BigDecimal("300.50"), Account.AIB, false, null));
+				new UpdateEntryRequest("Tech", "Laptop", new BigDecimal("300.50"), Account.AIB, false, null, null));
 		assertThat(response.endMonth()).isNull();
 	}
 
 	@Test
 	void updateMissingEntryThrowsNotFound() {
 		given(this.entryRepository.findById(99L)).willReturn(Optional.empty());
-		UpdateEntryRequest request = new UpdateEntryRequest("X", null, BigDecimal.ONE, Account.AIB, false, null);
+		UpdateEntryRequest request = new UpdateEntryRequest("X", null, BigDecimal.ONE, Account.AIB, false, null, null);
 		assertThatThrownBy(() -> this.entryService.update(99L, request)).isInstanceOfSatisfying(
 				ResponseStatusException.class, (ex) -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
 	}
@@ -246,7 +282,7 @@ class EntryServiceTest {
 
 	private static CreateEntryRequest createRequest(boolean oneOff) {
 		return new CreateEntryRequest(EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), Account.REVOLUT,
-				OCT, oneOff, null);
+				OCT, oneOff, null, null);
 	}
 
 	private void assertBadRequest(Runnable action) {

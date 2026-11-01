@@ -33,6 +33,10 @@ export interface Entry {
   endMonth: string | null;
   /** The Pot this Expense is a Contribution to. */
   potId: number | null;
+  /** The day of the month this Expense goes out, 1 to 31; null if not set, and always for Income. */
+  dueDay: number | null;
+  /** The Due Day as it falls in the month returned: the 31st is the 30th in November. */
+  dueDayInMonth: number | null;
   createdAt: string;
 }
 
@@ -46,6 +50,8 @@ export interface UpdateEntryRequest {
   oneOff: boolean;
   /** Makes an Expense a Contribution to this Pot; null for none. Always null on Income. */
   potId: number | null;
+  /** 1 to 31, or null for none. Always null on Income. */
+  dueDay: number | null;
 }
 
 /** Body of POST /api/entries. `startMonth` is the month being viewed. */

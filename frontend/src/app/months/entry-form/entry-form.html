@@ -103,15 +103,36 @@
       }
     </div>
 
-    @if (type() === 'EXPENSE' && potOptions().length > 0) {
-      <div class="field">
-        <label for="entry-pot">Pays into pot <span class="optional">(optional)</span></label>
-        <select id="entry-pot" class="text-input" formControlName="potId">
-          <option [ngValue]="null">None</option>
-          @for (pot of potOptions(); track pot.id) {
-            <option [ngValue]="pot.id">{{ pot.name }}</option>
+    @if (type() === 'EXPENSE') {
+      <div class="pair">
+        <div class="field">
+          <label for="entry-due-day">Due day <span class="optional">(optional)</span></label>
+          <input
+            id="entry-due-day"
+            class="text-input"
+            type="number"
+            inputmode="numeric"
+            formControlName="dueDay"
+            min="1"
+            max="31"
+            step="1"
+            placeholder="1 to 31"
+          />
+          @if (form.controls.dueDay.touched && form.controls.dueDay.invalid) {
+            <small class="error">Enter a day from 1 to 31</small>
           }
-        </select>
+        </div>
+        @if (potOptions().length > 0) {
+          <div class="field">
+            <label for="entry-pot">Pays into pot <span class="optional">(optional)</span></label>
+            <select id="entry-pot" class="text-input" formControlName="potId">
+              <option [ngValue]="null">None</option>
+              @for (pot of potOptions(); track pot.id) {
+                <option [ngValue]="pot.id">{{ pot.name }}</option>
+              }
+            </select>
+          </div>
+        }
       </div>
     }
 

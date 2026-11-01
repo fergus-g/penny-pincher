@@ -98,6 +98,11 @@ export class EntryForm implements OnInit {
     account: new FormControl<Account>(DEFAULT_ACCOUNT, { nonNullable: true }),
     oneOff: new FormControl(false, { nonNullable: true }),
     potId: new FormControl<number | null>(null),
+    dueDay: new FormControl<number | null>(null, [
+      Validators.min(1),
+      Validators.max(31),
+      Validators.pattern(/^[0-9]+$/),
+    ]),
   });
   protected readonly accounts = ACCOUNTS;
 
@@ -111,6 +116,7 @@ export class EntryForm implements OnInit {
         account: entry.account ?? DEFAULT_ACCOUNT,
         oneOff: entry.endMonth === entry.startMonth,
         potId: entry.potId,
+        dueDay: entry.dueDay,
       });
     }
   }
@@ -125,7 +131,7 @@ export class EntryForm implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
-    const { category, name, amount, account, oneOff, potId } = this.form.getRawValue();
+    const { category, name, amount, account, oneOff, potId, dueDay } = this.form.getRawValue();
     const body: UpdateEntryRequest = {
       category: category.trim(),
       name: name.trim() || null,
@@ -134,6 +140,8 @@ export class EntryForm implements OnInit {
       account: this.type() === 'EXPENSE' ? account : null,
       oneOff,
       potId: this.type() === 'EXPENSE' ? potId : null,
+      // An empty number input reads as null; Income never has a Due Day.
+      dueDay: this.type() === 'EXPENSE' && dueDay !== null ? Number(dueDay) : null,
     };
     const entry = this.entry();
     const request = entry

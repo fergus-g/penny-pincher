@@ -18,7 +18,7 @@ import { CheckInForm } from '../check-in-form/check-in-form';
 import { EntryForm } from '../entry-form/entry-form';
 import { ExpenseChart } from '../expense-chart/expense-chart';
 import { MonthApi } from '../month-api';
-import { monthLabel, toDate } from '../month-label';
+import { monthLabel, ordinal, toDate } from '../month-label';
 import {
   accountLabel,
   Entry,
@@ -95,6 +95,12 @@ export class MonthPage {
     const month = this.summary.hasValue() ? this.summary.value() : null;
     return (['INCOME', 'EXPENSE'] as const).map((type) => {
       const entries = this.entries().filter((entry) => entry.type === type);
+      if (type === 'EXPENSE') {
+        // By the day they go out; those with no Due Day last, each group in the order added.
+        entries.sort(
+          (a, b) => (a.dueDayInMonth ?? Infinity) - (b.dueDayInMonth ?? Infinity) || a.id - b.id,
+        );
+      }
       return {
         type,
         ...SECTION[type],
@@ -352,8 +358,8 @@ export class MonthPage {
   }
 
   /**
-   * Category, then the Account unless it's the home one, then the Pot a Contribution pays into:
-   * "Loans · Revolut → Car loan".
+   * Category, the Account unless it's the default one, the Due Day, then the Pot a Contribution
+   * pays into: "Loans · Revolut · Due 1st → Car loan".
    */
   protected entryMeta(entry: Entry): string {
     const pot = this.potList().find((candidate) => candidate.id === entry.potId);
@@ -361,6 +367,7 @@ export class MonthPage {
       [
         entry.category,
         entry.account && entry.account !== DEFAULT_ACCOUNT ? accountLabel(entry.account) : null,
+        entry.dueDayInMonth ? `Due ${ordinal(entry.dueDayInMonth)}` : null,
       ]
         .filter((part) => part !== null)
         .join(' · ') + (pot ? ` → ${pot.name}` : '')
