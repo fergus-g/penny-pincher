@@ -123,6 +123,11 @@
       </section>
 
       <aside class="rail" aria-label="Month at a glance">
+        <app-expense-calendar
+          [month]="month.month"
+          [entries]="month.entries"
+          (edit)="openEdit($event)"
+        />
         <!-- Chart.js is loaded only once the chart scrolls into view, keeping it out of the first load. -->
         @defer (on viewport) {
           <app-expense-chart [categories]="month.expensesByCategory" />

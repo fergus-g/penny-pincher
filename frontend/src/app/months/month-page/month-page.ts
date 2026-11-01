@@ -16,6 +16,7 @@ import { Router } from '@angular/router';
 import { AllocationForm } from '../allocation-form/allocation-form';
 import { CheckInForm } from '../check-in-form/check-in-form';
 import { EntryForm } from '../entry-form/entry-form';
+import { ExpenseCalendar } from '../expense-calendar/expense-calendar';
 import { ExpenseChart } from '../expense-chart/expense-chart';
 import { MonthApi } from '../month-api';
 import { monthLabel, ordinal, toDate } from '../month-label';
@@ -70,7 +71,15 @@ const MAX_ROWS = 5;
 const RECENT_CATEGORIES = 6;
 
 @Component({
-  imports: [AllocationForm, CheckInForm, CurrencyPipe, EntryForm, ExpenseChart, PotForm],
+  imports: [
+    AllocationForm,
+    CheckInForm,
+    CurrencyPipe,
+    EntryForm,
+    ExpenseCalendar,
+    ExpenseChart,
+    PotForm,
+  ],
   selector: 'app-month-page',
   styleUrl: './month-page.scss',
   templateUrl: './month-page.html',

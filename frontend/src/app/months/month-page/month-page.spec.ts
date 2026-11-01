@@ -15,9 +15,10 @@ import {
   MonthSummary,
   Pot,
   PotBalance,
+  UpdateEntryRequest,
   UpdatePotRequest,
 } from '../month.model';
-import { MonthPage } from './month-page';
+import { currentMonth, MonthPage } from './month-page';
 
 function entry(
   id: number,
@@ -196,6 +197,20 @@ class FakeMonthApi {
     };
     this.months[request.startMonth] = [...(this.months[request.startMonth] ?? []), created];
     return of(created);
+  }
+
+  updateEntry(id: number, request: UpdateEntryRequest): Observable<Entry> {
+    let updated: Entry | undefined;
+    for (const month of Object.keys(this.months)) {
+      this.months[month] = this.months[month].map((e) => {
+        if (e.id !== id) {
+          return e;
+        }
+        updated = { ...e, ...request, amount: request.amount ?? e.amount };
+        return updated;
+      });
+    }
+    return of(updated!);
   }
 
   deleteEntry(id: number): Observable<void> {
@@ -1226,5 +1241,122 @@ describe('MonthPage allocation', () => {
       'allowance 6.7%',
       'debt 13.3%',
     ]);
+  });
+});
+
+describe('MonthPage due-day calendar', () => {
+  let api: FakeMonthApi;
+
+  beforeEach(() => {
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+      this.open = false;
+    };
+    api = new FakeMonthApi();
+  });
+
+  const due = (
+    id: number,
+    name: string,
+    amount: number,
+    dueDay: number | null,
+    dayInMonth = dueDay,
+  ) => ({
+    ...entry(id, 'EXPENSE', name, amount, id === 2 ? 'REVOLUT' : 'AIB'),
+    dueDay,
+    dueDayInMonth: dayInMonth,
+  });
+
+  const calendar = (el: HTMLElement) =>
+    el.querySelector<HTMLElement>('aside.rail app-expense-calendar')!;
+  const dueDays = (el: HTMLElement) =>
+    Array.from(calendar(el).querySelectorAll<HTMLButtonElement>('button.day'));
+  const listed = (el: HTMLElement) =>
+    Array.from(calendar(el).querySelectorAll('.day-list li'), (li) =>
+      Array.from(li.querySelectorAll('.name, .account, .amount'), (part) =>
+        part.textContent!.replace('Edit ', '').trim(),
+      ).join(' | '),
+    );
+
+  it('lay out the month being viewed, Monday first, and follow month navigation', async () => {
+    const page = await render(api);
+
+    // 1 November 2026 is a Sunday: six blanks, then 30 days.
+    expect(calendar(page.el).querySelectorAll('.blank')).toHaveLength(6);
+    expect(calendar(page.el).querySelectorAll('.day')).toHaveLength(30);
+
+    page.fixture.componentRef.setInput('month', '2026-12');
+    await page.fixture.whenStable();
+    // 1 December 2026 is a Tuesday.
+    expect(calendar(page.el).querySelectorAll('.blank')).toHaveLength(1);
+    expect(calendar(page.el).querySelectorAll('.day')).toHaveLength(31);
+  });
+
+  it('total each due day, put a 31st on the 30th, and leave out Expenses with no Due Day', async () => {
+    api.months['2026-11'] = [
+      due(1, 'Mortgage', 1100, 1),
+      due(2, 'Netflix', 18, 1),
+      due(3, 'Gym', 40, 31, 30),
+      due(4, 'Takeaway', 25, null),
+      entry(5, 'INCOME', 'Salary', 3000),
+    ];
+    const { el } = await render(api);
+
+    expect(dueDays(el).map((day) => day.getAttribute('aria-label'))).toEqual([
+      'Sunday 1st: 2 Expenses, €1,118.00',
+      'Monday 30th: 1 Expense, €40.00',
+    ]);
+    expect(dueDays(el)[0].querySelector('.total')!.textContent).toContain('€1,118');
+    expect(calendar(el).textContent).not.toContain('Takeaway');
+  });
+
+  it("list a day's Expenses by mouse, touch and keyboard", async () => {
+    api.months['2026-11'] = [
+      due(1, 'Mortgage', 1100, 1),
+      due(2, 'Netflix', 18, 1),
+      due(3, 'Gym', 40, 30),
+    ];
+    const page = await render(api);
+    const [first, last] = dueDays(page.el);
+
+    first.dispatchEvent(new MouseEvent('mouseenter'));
+    await page.fixture.whenStable();
+    expect(listed(page.el)).toEqual(['Mortgage | AIB | €1,100.00', 'Netflix | Revolut | €18.00']);
+
+    last.dispatchEvent(new FocusEvent('focus'));
+    await page.fixture.whenStable();
+    expect(listed(page.el)).toEqual(['Gym | AIB | €40.00']);
+
+    first.click();
+    await page.fixture.whenStable();
+    expect(first.getAttribute('aria-pressed')).toBe('true');
+    expect(listed(page.el)).toHaveLength(2);
+  });
+
+  it('open the edit dialog from the day list, and show the saved change on the calendar', async () => {
+    api.months['2026-11'] = [due(1, 'Mortgage', 1100, 1)];
+    const page = await render(api);
+    dueDays(page.el)[0].click();
+    await page.fixture.whenStable();
+
+    calendar(page.el).querySelector<HTMLButtonElement>('.day-list li button')!.click();
+    await page.fixture.whenStable();
+    const amount = page.el.querySelector<HTMLInputElement>('dialog #entry-amount')!;
+    expect(amount.value).toBe('1100');
+    amount.value = '1150';
+    amount.dispatchEvent(new Event('input'));
+    page.el.querySelector('dialog form')!.dispatchEvent(new Event('submit'));
+    await page.fixture.whenStable();
+
+    expect(dueDays(page.el)[0].getAttribute('aria-label')).toBe('Sunday 1st: 1 Expense, €1,150.00');
+  });
+
+  it('highlight today when viewing the current month', async () => {
+    const page = await render(api, currentMonth());
+
+    const today = calendar(page.el).querySelector('[aria-current="date"]')!;
+    expect(today.querySelector('.number')!.textContent!.trim()).toBe(String(new Date().getDate()));
   });
 });

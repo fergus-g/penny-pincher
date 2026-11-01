@@ -1,0 +1,59 @@
+<section class="card" aria-labelledby="expense-calendar-title">
+  <h2 id="expense-calendar-title">Due this month</h2>
+
+  <div class="grid">
+    @for (weekday of weekdays; track weekday) {
+      <span class="weekday" aria-hidden="true">{{ weekday }}</span>
+    }
+    @for (blank of leading(); track $index) {
+      <span class="blank"></span>
+    }
+    @for (day of days(); track day.day) {
+      @if (day.expenses.length > 0) {
+        <button
+          type="button"
+          class="day due"
+          [class.today]="day.today"
+          [class.selected]="selected()?.day === day.day"
+          [attr.aria-label]="dayLabel(day)"
+          [attr.aria-pressed]="selected()?.day === day.day"
+          [attr.aria-current]="day.today ? 'date' : null"
+          (mouseenter)="select(day.day)"
+          (focus)="select(day.day)"
+          (click)="select(day.day)"
+        >
+          <span class="number">{{ day.day }}</span>
+          <span class="dot" aria-hidden="true"></span>
+          <span class="total" aria-hidden="true">{{
+            day.total | currency: 'EUR' : 'symbol' : '1.0-0'
+          }}</span>
+        </button>
+      } @else {
+        <span class="day" [class.today]="day.today" [attr.aria-current]="day.today ? 'date' : null">
+          <span class="number">{{ day.day }}</span>
+        </span>
+      }
+    }
+  </div>
+
+  <div class="day-list" aria-live="polite">
+    @if (selected(); as day) {
+      <h3>Due on the {{ ordinal(day.day) }}</h3>
+      <ul>
+        @for (entry of day.expenses; track entry.id) {
+          <li>
+            <button type="button" (click)="edit.emit(entry)">
+              <span class="name"
+                ><span class="visually-hidden">Edit </span>{{ entry.name ?? entry.category }}</span
+              >
+              <span class="account">{{ entry.account ? accountLabel(entry.account) : '' }}</span>
+              <span class="amount">{{ entry.amount | currency: 'EUR' }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="hint">Hover or tap a day with a dot to see what goes out.</p>
+    }
+  </div>
+</section>
