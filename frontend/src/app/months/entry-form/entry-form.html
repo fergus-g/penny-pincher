@@ -1,0 +1,42 @@
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <h2>{{ title() }}</h2>
+
+  <label>
+    Category
+    <input formControlName="category" maxlength="50" />
+    @if (form.controls.category.touched && form.controls.category.invalid) {
+      <small class="error">Category is required</small>
+    }
+  </label>
+
+  <label>
+    Name <span class="optional">(optional)</span>
+    <input formControlName="name" maxlength="100" />
+  </label>
+
+  <label>
+    Amount (€)
+    <input type="number" formControlName="amount" min="0.01" step="0.01" />
+    @if (form.controls.amount.touched) {
+      @if (form.controls.amount.hasError('required') || form.controls.amount.hasError('min')) {
+        <small class="error">Amount must be more than 0</small>
+      } @else if (form.controls.amount.hasError('pattern')) {
+        <small class="error">Use at most 2 decimal places</small>
+      }
+    }
+  </label>
+
+  <label class="checkbox">
+    <input type="checkbox" formControlName="oneOff" />
+    One-off (only {{ entry() ? 'its first month' : 'this month' }})
+  </label>
+
+  @if (error(); as error) {
+    <p class="error">{{ error }}</p>
+  }
+
+  <div class="actions">
+    <button type="button" [disabled]="saving()" (click)="cancelled.emit()">Cancel</button>
+    <button type="submit" [disabled]="saving()">{{ saving() ? 'Saving…' : 'Save' }}</button>
+  </div>
+</form>
