@@ -241,6 +241,65 @@ main {
   font-size: 13px;
 }
 
+/*
+ * Income split by the Allocation. Colours are checked for colour-blind separation between
+ * neighbours (orange, blue, aqua, violet); the red overflow is the Shortfall.
+ */
+.bar.stacked {
+  display: flex;
+  gap: 2px;
+}
+
+.segment {
+  height: 100%;
+}
+
+[data-part='expenses'] {
+  background: var(--expense);
+}
+
+[data-part='savings'] {
+  background: #2a78d6;
+}
+
+[data-part='allowance'] {
+  background: #1baf7a;
+}
+
+[data-part='debt'] {
+  background: #6250d6;
+}
+
+[data-part='over'] {
+  background: var(--danger);
+}
+
+.bar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin: 0;
+  padding: 0;
+  color: var(--muted);
+  font-size: 13px;
+  list-style: none;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .over {
+    color: var(--danger);
+  }
+}
+
 /* Transfers card */
 
 .transfers {

@@ -137,8 +137,24 @@ class FakeMonthApi {
     return of(undefined);
   }
 
+  /** Records the request, and splits this month's Remainder with it as the backend would. */
   saveAllocation(month: string, request: AllocationRequest): Observable<unknown> {
     this.savedAllocations.push({ month, request });
+    const { remainder } = summary(month, this.months[month] ?? []);
+    const planned = request.savings + request.allowance;
+    this.allocations[month] = {
+      effectiveFrom: month,
+      savings: request.savings,
+      allowance: request.allowance,
+      debtRepayment: Math.max(0, remainder - planned),
+      shortfall: planned > remainder,
+      savingsPotId: request.savingsPotId,
+      savingsPotName: this.pots.find((pot) => pot.id === request.savingsPotId)?.name ?? null,
+      debtPotId: request.debtPotId,
+      debtPotName: this.pots.find((pot) => pot.id === request.debtPotId)?.name ?? null,
+      debtOverflow: 0,
+      debtPaidOffIn: null,
+    };
     return of({ effectiveFrom: month, ...request });
   }
 
@@ -1128,6 +1144,87 @@ describe('MonthPage allocation', () => {
           debtPotId: 1,
         },
       },
+    ]);
+  });
+
+  /** Each stacked segment as "part width%", rounded to one decimal. */
+  const segments = (el: HTMLElement) =>
+    Array.from(
+      el.querySelectorAll<HTMLElement>('section.totals .bar.stacked .segment'),
+      (segment) => `${segment.dataset['part']} ${parseFloat(segment.style.width).toFixed(1)}%`,
+    );
+  const legend = (el: HTMLElement) =>
+    Array.from(el.querySelectorAll('section.totals .bar-legend li'), (li) =>
+      li.textContent!.replace(/\s+/g, ' ').trim(),
+    );
+
+  it('split Income in the totals bar into four labelled segments', async () => {
+    api.allocations['2026-11'] = split();
+    const { el } = await render(api);
+
+    expect(segments(el)).toEqual([
+      'expenses 66.7%',
+      'savings 13.3%',
+      'allowance 6.7%',
+      'debt 13.3%',
+    ]);
+    expect(legend(el)).toEqual([
+      'Expenses €2,000.00',
+      'Savings €400.00',
+      'Allowance €200.00',
+      'Debt Repayment €400.00',
+    ]);
+    expect(el.querySelector('section.totals .bar.stacked')!.getAttribute('aria-label')).toBe(
+      'Income €3,000.00: Expenses €2,000.00, Savings €400.00, Allowance €200.00, Debt Repayment €400.00',
+    );
+    expect(el.querySelector('section.totals')!.textContent).toContain('Left over this month');
+  });
+
+  it('show a Shortfall as a red overflow past Income, described for screen readers', async () => {
+    api.months['2026-11'] = [entry(1, 'INCOME', 'Salary', 2500), entry(2, 'EXPENSE', 'Rent', 2000)];
+    api.allocations['2026-11'] = split({ debtRepayment: 0, shortfall: true });
+    const { el } = await render(api);
+
+    // €2,600 planned on €2,500 of Income: the bar spans €2,600 and the last €100 is red.
+    expect(segments(el)).toEqual([
+      'expenses 76.9%',
+      'savings 15.4%',
+      'allowance 3.8%',
+      'over 3.8%',
+    ]);
+    expect(legend(el).at(-1)).toBe('Over Income by €100.00');
+    expect(el.querySelector('section.totals .bar.stacked')!.getAttribute('aria-label')).toContain(
+      'Shortfall: €100.00 more than Income',
+    );
+  });
+
+  it('keep the plain spent bar without an Allocation', async () => {
+    const { el } = await render(api);
+
+    expect(el.querySelector('section.totals .bar.stacked')).toBeNull();
+    expect(el.querySelector('section.totals')!.textContent).toContain('67% of income spent');
+  });
+
+  it('update the bar as soon as an Allocation is saved', async () => {
+    const page = await render(api);
+    page.el.querySelector<HTMLButtonElement>('.allocate-button')!.click();
+    await page.fixture.whenStable();
+    for (const [id, value] of Object.entries({
+      'allocation-savings': '400',
+      'allocation-allowance': '200',
+    })) {
+      const input = page.el.querySelector<HTMLInputElement>(`dialog #${id}`)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+    }
+    page.el.querySelector('dialog form')!.dispatchEvent(new Event('submit'));
+    await page.fixture.whenStable();
+
+    expect(segments(page.el)).toEqual([
+      'expenses 66.7%',
+      'savings 13.3%',
+      'allowance 6.7%',
+      'debt 13.3%',
     ]);
   });
 });
