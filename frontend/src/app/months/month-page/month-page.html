@@ -124,7 +124,8 @@
         @if (split.shortfall) {
           <p class="warning" role="note">
             <strong>Shortfall:</strong> Savings and Allowance are
-            {{ split.shortfallBy | currency: 'EUR' }} more than what's left over this month.
+            {{ split.shortfallBy | currency: 'EUR' }} more than what's left over this month. They're
+            still transferred in full, so you'll be moving more than is left over.
           </p>
         }
         @if (split.debtPotName && split.paidOffLabel) {
@@ -246,7 +247,7 @@
                       ><span class="visually-hidden">Edit </span>{{ entryLabel(entry) }}</span
                     >
                     <span class="entry-meta">
-                      {{ entry.category }} · {{ accountLabel(entry.account) }}
+                      {{ entryMeta(entry) }}
                       <span class="badge" [class]="badge.tone">{{ badge.label }}</span>
                     </span>
                   </span>
@@ -344,7 +345,6 @@
         [month]="month()"
         [(saving)]="saving"
         (saved)="onPotChanged()"
-        (deleted)="onPotChanged()"
         (cancelled)="potDialog.close()"
       />
     } @else if (editing.form === 'allocation') {

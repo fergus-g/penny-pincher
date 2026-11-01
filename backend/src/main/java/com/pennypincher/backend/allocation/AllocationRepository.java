@@ -13,6 +13,4 @@ public interface AllocationRepository extends JpaRepository<Allocation, Long> {
 	/** The Allocation in force in {@code month}: the latest one effective on or before it. */
 	Optional<Allocation> findFirstByEffectiveFromLessThanEqualOrderByEffectiveFromDesc(YearMonth month);
 
-	boolean existsBySavingsPotIdOrDebtPotId(Long savingsPotId, Long debtPotId);
-
 }

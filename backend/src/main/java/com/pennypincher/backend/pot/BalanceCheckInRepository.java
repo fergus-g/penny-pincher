@@ -12,6 +12,4 @@ public interface BalanceCheckInRepository extends JpaRepository<BalanceCheckIn, 
 
 	Optional<BalanceCheckIn> findByPotIdAndMonth(Long potId, YearMonth month);
 
-	void deleteByPotId(Long potId);
-
 }

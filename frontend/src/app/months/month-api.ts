@@ -60,10 +60,10 @@ export class MonthApi {
     return this.http.put<Pot>(`/api/pots/${id}`, request);
   }
 
-  /** Fails with 409 when the Pot has Contributions. */
-  deletePot(id: number): Observable<void> {
-    console.log('[MonthApi] deletePot', id);
-    return this.http.delete<void>(`/api/pots/${id}`);
+  /** Drops a Balance Check-in, so that month's balance is calculated again. */
+  deleteCheckIn(potId: number, month: string): Observable<void> {
+    console.log('[MonthApi] deleteCheckIn', potId, month);
+    return this.http.delete<void>(`/api/pots/${potId}/check-ins/${month}`);
   }
 
   /** Sets the Allocation from `month` onwards; earlier months keep theirs. */

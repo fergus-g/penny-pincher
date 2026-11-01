@@ -1,8 +1,7 @@
 import { DeferBlockState, TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { provideRouter } from '@angular/router';
-import { HttpErrorResponse } from '@angular/common/http';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, of } from 'rxjs';
 
 import { MonthApi } from '../month-api';
 import {
@@ -14,6 +13,7 @@ import {
   MonthSummary,
   Pot,
   PotBalance,
+  UpdatePotRequest,
 } from '../month.model';
 import { MonthPage } from './month-page';
 
@@ -75,6 +75,7 @@ class FakeMonthApi {
   pots: Pot[] = [];
   potBalances: Record<string, PotBalance[]> = {};
   checkIns: { potId: number; month: string; balance: number }[] = [];
+  removedCheckIns: { potId: number; month: string }[] = [];
   /** Each month's Allocation split, as the backend would calculate it. */
   allocations: Record<string, AllocationSummary> = {};
   savedAllocations: { month: string; request: AllocationRequest }[] = [];
@@ -106,10 +107,17 @@ class FakeMonthApi {
     return of(pot);
   }
 
-  /** Refuses like the backend does for a Pot with Contributions. */
-  deletePot(id: number): Observable<void> {
-    const detail = `Pot ${id} has Contributions; archive it instead`;
-    return throwError(() => new HttpErrorResponse({ status: 409, error: { detail } }));
+  updatePot(id: number, request: UpdatePotRequest): Observable<Pot> {
+    this.pots = this.pots.map((pot) => (pot.id === id ? { ...pot, ...request } : pot));
+    return of(this.pots.find((pot) => pot.id === id)!);
+  }
+
+  deleteCheckIn(potId: number, month: string): Observable<void> {
+    this.removedCheckIns.push({ potId, month });
+    this.potBalances[month] = (this.potBalances[month] ?? []).map((pot) =>
+      pot.id === potId ? { ...pot, checkedIn: false } : pot,
+    );
+    return of(undefined);
   }
 
   saveAllocation(month: string, request: AllocationRequest): Observable<unknown> {
@@ -641,20 +649,56 @@ describe('MonthPage pots', () => {
     expect(potRows(page.el)[0]).toContain('Checked in');
   });
 
-  it('explain why a Pot with Contributions cannot be deleted', async () => {
+  it('archive a Pot from the month being viewed, with no way to delete it', async () => {
     const page = await render(api);
 
     page.el.querySelector<HTMLButtonElement>('section.pots .pot-main')!.click();
     await page.fixture.whenStable();
-    const deleteButton = () => page.el.querySelector<HTMLButtonElement>('dialog button.delete')!;
-    deleteButton().click();
-    await page.fixture.whenStable();
-    deleteButton().click();
+    expect(page.el.querySelector('dialog button.delete')).toBeNull();
+    const archive = page.el.querySelector<HTMLButtonElement>('dialog .side-action')!;
+    expect(archive.textContent).toContain('Archive from November 2026');
+    archive.click();
     await page.fixture.whenStable();
 
-    expect(page.el.querySelector('dialog [role="alert"]')!.textContent).toContain(
-      'archive it instead',
-    );
+    expect(api.pots[0].archivedFrom).toBe('2026-11');
+  });
+
+  it('remove a Check-in, but only from a month that has one', async () => {
+    const page = await render(api);
+    const checkInButtons = () =>
+      page.el.querySelectorAll<HTMLButtonElement>('section.pots .check-in-button');
+
+    checkInButtons()[0].click();
+    await page.fixture.whenStable();
+    expect(page.el.querySelector('dialog .side-action')).toBeNull();
+    page.el.querySelectorAll<HTMLButtonElement>('dialog .secondary')[0].click();
+    await page.fixture.whenStable();
+
+    checkInButtons()[1].click();
+    await page.fixture.whenStable();
+    const remove = page.el.querySelector<HTMLButtonElement>('dialog .side-action')!;
+    expect(remove.textContent).toContain('Remove check-in');
+    remove.click();
+    await page.fixture.whenStable();
+
+    expect(api.removedCheckIns).toEqual([{ potId: 2, month: '2026-11' }]);
+    expect(potRows(page.el)[1]).not.toContain('Checked in');
+  });
+
+  it('show the Pot a Contribution pays into, and the Account only when it is not AIB', async () => {
+    api.months['2026-11'] = [
+      { ...entry(1, 'EXPENSE', 'Car repayment', 250), category: 'Loans', potId: 1 },
+      { ...entry(2, 'EXPENSE', 'Netflix', 18, 'REVOLUT'), category: 'Subscriptions' },
+      { ...entry(3, 'EXPENSE', 'Mortgage', 1100), category: 'Housing' },
+    ];
+    const page = await render(api);
+    page.toggle('Expenses')!.click();
+    await page.fixture.whenStable();
+
+    const meta = page
+      .rows('Expenses')
+      .map((row) => row.querySelector('.entry-meta')!.firstChild!.textContent!.trim());
+    expect(meta).toEqual(['Loans → Car loan', 'Subscriptions · Revolut', 'Housing']);
   });
 
   it('let an Expense pay into a Pot, but not Income', async () => {
@@ -771,6 +815,7 @@ describe('MonthPage allocation', () => {
     const { el } = await render(api);
 
     expect(card(el)).toContain('Shortfall: Savings and Allowance are €100.00 more');
+    expect(card(el)).toContain("They're still transferred in full");
     expect(shares(el)).toEqual([
       'Savings €400.00 Rainy day',
       'Allowance €200.00 Revolut',

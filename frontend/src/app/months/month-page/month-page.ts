@@ -360,7 +360,18 @@ export class MonthPage {
       : { label: `Until ${monthLabel(entry.endMonth, 'short')}`, tone: 'until' };
   }
 
-  protected readonly accountLabel = accountLabel;
+  /**
+   * Category, then the Account unless it's the home one, then the Pot a Contribution pays into:
+   * "Loans · Revolut → Car loan".
+   */
+  protected entryMeta(entry: Entry): string {
+    const pot = this.potList().find((candidate) => candidate.id === entry.potId);
+    return (
+      [entry.category, entry.account === HOME_ACCOUNT ? null : accountLabel(entry.account)]
+        .filter((part) => part !== null)
+        .join(' · ') + (pot ? ` → ${pot.name}` : '')
+    );
+  }
 
   protected entryLabel(entry: Entry): string {
     return entry.name ?? entry.category;

@@ -272,6 +272,11 @@ legend {
   }
 }
 
+/* A secondary action on the left of the footer, away from Cancel and Save. */
+.side-action {
+  margin-right: auto;
+}
+
 .actions {
   display: flex;
   gap: 12px;

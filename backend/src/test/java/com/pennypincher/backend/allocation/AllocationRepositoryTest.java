@@ -11,9 +11,6 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.dao.DataIntegrityViolationException;
 
 import com.pennypincher.backend.entry.Account;
-import com.pennypincher.backend.pot.Pot;
-import com.pennypincher.backend.pot.PotKind;
-import com.pennypincher.backend.pot.PotRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -33,9 +30,6 @@ class AllocationRepositoryTest {
 	@Autowired
 	private AllocationRepository allocationRepository;
 
-	@Autowired
-	private PotRepository potRepository;
-
 	@Test
 	void theAllocationInForceIsTheLatestToStartOnOrBeforeTheMonth() {
 		save(JAN, null);
@@ -52,13 +46,8 @@ class AllocationRepositoryTest {
 	}
 
 	@Test
-	void aTargetedPotIsKnownToBeTargeted() {
-		Long potId = this.potRepository
-			.saveAndFlush(new Pot("Test pot", PotKind.SAVINGS, Account.AIB, BigDecimal.TEN, JAN))
-			.getId();
-		assertThat(this.allocationRepository.existsBySavingsPotIdOrDebtPotId(potId, potId)).isFalse();
-		save(JAN, potId);
-		assertThat(this.allocationRepository.existsBySavingsPotIdOrDebtPotId(potId, potId)).isTrue();
+	void aTargetPotMustExist() {
+		assertThatThrownBy(() -> save(JAN, -1L)).isInstanceOf(DataIntegrityViolationException.class);
 	}
 
 	private void save(YearMonth from, Long savingsPotId) {

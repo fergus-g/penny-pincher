@@ -17,8 +17,8 @@ import {
 } from '../month.model';
 
 /**
- * Add form when `pot` is null, edit form otherwise. Editing also offers Archive (from the month
- * being viewed) and Delete, which the backend refuses once the Pot has Contributions.
+ * Add form when `pot` is null, edit form otherwise. Editing also offers Archive, from the month
+ * being viewed: the only way to retire a Pot, so its history stays.
  */
 @Component({
   imports: [ReactiveFormsModule],
@@ -34,13 +34,10 @@ export class PotForm implements OnInit {
   readonly month = input.required<string>();
 
   readonly saved = output<void>();
-  readonly deleted = output<void>();
   readonly cancelled = output<void>();
 
   /** True while a request is in flight. A model so the page can block closing the dialog. */
   readonly saving = model(false);
-  /** Delete takes two clicks: the first turns the button into "Confirm delete". */
-  protected readonly confirmingDelete = signal(false);
   protected readonly error = signal<string | null>(null);
 
   protected readonly title = computed(() => (this.pot() ? 'Edit pot' : 'Add pot'));
@@ -89,7 +86,6 @@ export class PotForm implements OnInit {
   }
 
   private save(archivedFrom: string | null): void {
-    this.confirmingDelete.set(false);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -112,33 +108,16 @@ export class PotForm implements OnInit {
           openingBalance: body.openingBalance,
           openingMonth,
         });
-    this.run(request, () => this.saved.emit(), "Couldn't save. Is the backend running?");
-  }
-
-  protected delete(): void {
-    if (!this.confirmingDelete()) {
-      this.confirmingDelete.set(true);
-      return;
-    }
-    this.run(
-      this.monthApi.deletePot(this.pot()!.id),
-      () => this.deleted.emit(),
-      "Couldn't delete. Is the backend running?",
-    );
-  }
-
-  private run(request: Observable<unknown>, done: () => void, fallback: string): void {
     this.saving.set(true);
     this.error.set(null);
     request.subscribe({
       next: () => {
         this.saving.set(false);
-        done();
+        this.saved.emit();
       },
       error: (error: HttpErrorResponse) => {
         this.saving.set(false);
-        this.confirmingDelete.set(false);
-        this.error.set(errorMessage(error, fallback));
+        this.error.set(errorMessage(error, "Couldn't save. Is the backend running?"));
       },
     });
   }
