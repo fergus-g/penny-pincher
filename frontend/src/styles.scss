@@ -1,1 +1,49 @@
-/* You can add global styles to this file, and also import other style files */
+/* Design tokens from issue #19. Custom properties reach into every component's styles. */
+:root {
+  --page: #f5f6f8;
+  --card: #ffffff;
+  --border: #e2e5ea;
+  --input-border: #c9ced6;
+  --text: #16191e;
+  --muted: #5a6370;
+  --income: #1e5bb8;
+  --expense: #c2640f;
+  --expense-text: #a1500b;
+  --danger: #b42318;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font-family: Inter, system-ui, sans-serif;
+  /* Tabular numbers keep amounts lined up. */
+  font-feature-settings: 'tnum' 1;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+/* Only shown for keyboard focus, not mouse clicks. */
+:focus-visible {
+  outline: 2px solid var(--income);
+  outline-offset: 2px;
+}
+
+/* Read by screen readers but not shown. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

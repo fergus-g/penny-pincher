@@ -3,20 +3,24 @@ import { Component, computed, inject, input, model, OnInit, output, signal } fro
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { MonthApi } from '../month-api';
+import { monthLabel } from '../month-label';
 import { Entry, EntryType, UpdateEntryRequest } from '../month.model';
 
 /** Turns a backend ProblemDetail (with per-field `errors`) into one line of text. */
-function errorMessage(error: HttpErrorResponse): string {
+function errorMessage(error: HttpErrorResponse, fallback: string): string {
   const fieldErrors: Record<string, string> | undefined = error.error?.errors;
   if (fieldErrors) {
     return Object.entries(fieldErrors)
       .map(([field, message]) => `${field} ${message}`)
       .join(', ');
   }
-  return error.error?.detail ?? "Couldn't save. Is the backend running?";
+  return error.error?.detail ?? fallback;
 }
 
-/** Add form when `entry` is null, edit form otherwise. Emits `saved` once the backend accepts it. */
+/**
+ * Add form when `entry` is null, edit form otherwise. Emits `saved` once the backend accepts it,
+ * or `deleted` once an edited Entry is deleted.
+ */
 @Component({
   imports: [ReactiveFormsModule],
   selector: 'app-entry-form',
@@ -30,16 +34,32 @@ export class EntryForm implements OnInit {
   /** The month being viewed; new entries start here. */
   readonly month = input.required<string>();
   readonly entry = input<Entry | null>(null);
+  /** Recently used categories, offered as quick picks when adding. */
+  readonly categories = input<string[]>([]);
 
   /** The Entry as the backend saved it. */
   readonly saved = output<Entry>();
+  readonly deleted = output<void>();
   readonly cancelled = output<void>();
 
-  protected readonly title = computed(
-    () => `${this.entry() ? 'Edit' : 'Add'} ${this.type() === 'INCOME' ? 'income' : 'expense'}`,
+  private readonly typeName = computed(() => (this.type() === 'INCOME' ? 'income' : 'expense'));
+  protected readonly title = computed(() => `${this.entry() ? 'Edit' : 'Add'} ${this.typeName()}`);
+  /** The month the Entry starts in, e.g. "November 2026". */
+  protected readonly startLabel = computed(() =>
+    monthLabel(this.entry()?.startMonth ?? this.month()),
   );
-  /** True while the request is in flight. A model so the page can block closing the dialog. */
+  protected readonly subtitle = computed(() =>
+    this.entry()
+      ? `Started ${this.startLabel()} · the start month can't be changed`
+      : `Starts in ${this.startLabel()}`,
+  );
+  protected readonly submitLabel = computed(() =>
+    this.entry() ? 'Save changes' : `Add ${this.typeName()}`,
+  );
+  /** True while a save or delete is in flight. A model so the page can block closing the dialog. */
   readonly saving = model(false);
+  /** Delete takes two clicks: the first turns the button into "Confirm delete". */
+  protected readonly confirmingDelete = signal(false);
   protected readonly error = signal<string | null>(null);
 
   protected readonly form = new FormGroup({
@@ -69,7 +89,12 @@ export class EntryForm implements OnInit {
     }
   }
 
+  protected pickCategory(category: string): void {
+    this.form.controls.category.setValue(category);
+  }
+
   protected submit(): void {
+    this.confirmingDelete.set(false);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -95,7 +120,26 @@ export class EntryForm implements OnInit {
       },
       error: (error: HttpErrorResponse) => {
         this.saving.set(false);
-        this.error.set(errorMessage(error));
+        this.error.set(errorMessage(error, "Couldn't save. Is the backend running?"));
+      },
+    });
+  }
+
+  protected delete(): void {
+    if (!this.confirmingDelete()) {
+      this.confirmingDelete.set(true);
+      return;
+    }
+    this.saving.set(true);
+    this.error.set(null);
+    this.monthApi.deleteEntry(this.entry()!.id).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.deleted.emit();
+      },
+      error: (error: HttpErrorResponse) => {
+        this.saving.set(false);
+        this.error.set(errorMessage(error, "Couldn't delete. Is the backend running?"));
       },
     });
   }

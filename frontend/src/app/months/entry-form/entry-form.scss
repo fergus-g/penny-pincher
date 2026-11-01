@@ -1,45 +1,316 @@
+:host {
+  display: block;
+}
+
+/* Fills the dialog; only the middle scrolls when the screen is short. */
 form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  min-width: 20rem;
-  font-family: system-ui, sans-serif;
+  max-height: calc(100dvh - 32px);
+}
+
+.form-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 28px 20px;
+  border-bottom: 1px solid var(--border);
 
   h2 {
-    margin: 0 0 0.25rem;
-    font-size: 1.25rem;
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
   }
 }
 
-label {
+.heading {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.875rem;
-
-  &.checkbox {
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5rem;
-  }
+  gap: 4px;
 }
 
-input:not([type='checkbox']) {
-  padding: 0.4rem 0.5rem;
-  font-size: 1rem;
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.close {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -8px -10px 0 0;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 24px 28px;
+  overflow-y: auto;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+label,
+legend {
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .optional {
-  color: #666;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.text-input,
+.money {
+  box-sizing: border-box;
+  height: 48px;
+  border: 1px solid var(--input-border);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+.text-input {
+  padding: 0 14px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--text);
+}
+
+/* The € sits inside the box, so the box shows focus for the input. */
+.money {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  color: var(--muted);
+  font-size: 16px;
+
+  &:focus-within {
+    outline: 2px solid var(--income);
+    outline-offset: 2px;
+  }
+
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    appearance: textfield;
+
+    /* Hide the number spinner arrows. */
+    &::-webkit-inner-spin-button,
+    &::-webkit-outer-spin-button {
+      margin: 0;
+      appearance: none;
+    }
+  }
+}
+
+.text-input.ng-invalid.ng-touched,
+.money:has(input.ng-invalid.ng-touched) {
+  border-color: var(--danger);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: -10px;
+}
+
+.chip {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--page);
+  color: #3d4652;
+  font-size: 13px;
+
+  &.selected {
+    border-color: var(--text);
+    background: var(--card);
+    color: var(--text);
+    font-weight: 600;
+  }
+}
+
+fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+legend {
+  margin-bottom: 8px;
+  padding: 0;
+}
+
+/* Radio cards: the whole card is the label, so clicking anywhere picks it. */
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--input-border);
+  border-radius: 12px;
+  font-weight: 400;
+  cursor: pointer;
+
+  &:has(input:checked) {
+    border-color: var(--text);
+    background: #f7f8fa;
+    box-shadow: inset 0 0 0 0.5px var(--text);
+  }
+
+  input {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    margin: 3px 0 0;
+    accent-color: var(--text);
+  }
+}
+
+.option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.option-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.option-hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #fdf3e7;
+  color: #6b3306;
+  font-size: 13px;
+  line-height: 1.5;
+
+  svg {
+    flex: none;
+    margin-top: 1px;
+    color: #8a4108;
+  }
 }
 
 .error {
   margin: 0;
-  color: #c62828;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.form-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 28px 24px;
+  border-top: 1px solid var(--border);
+}
+
+.delete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  margin: 0 auto 0 -14px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--danger);
+  font-size: 15px;
+  font-weight: 600;
+
+  &.confirming {
+    background: #fef3f2;
+  }
 }
 
 .actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
+  gap: 12px;
+}
+
+.secondary,
+.primary {
+  height: 48px;
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+.secondary {
+  padding: 0 20px;
+  border: 1px solid var(--input-border);
+  background: var(--card);
+  font-weight: 500;
+}
+
+.primary {
+  padding: 0 22px;
+  border: none;
+  background: var(--text);
+  color: #fff;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .form-header,
+  .form-body {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  .form-footer {
+    padding: 16px 20px 20px;
+  }
+
+  .pair {
+    grid-template-columns: 1fr;
+  }
 }
