@@ -124,7 +124,8 @@
         @if (split.shortfall) {
           <p class="warning" role="note">
             <strong>Shortfall:</strong> Savings and Allowance are
-            {{ split.shortfallBy | currency: 'EUR' }} more than what's left over this month.
+            {{ split.shortfallBy | currency: 'EUR' }} more than what's left over this month. They're
+            still transferred in full, so you'll be moving more than is left over.
           </p>
         }
         @if (split.debtPotName && split.paidOffLabel) {
@@ -246,7 +247,7 @@
                       ><span class="visually-hidden">Edit </span>{{ entryLabel(entry) }}</span
                     >
                     <span class="entry-meta">
-                      {{ entry.category }} · {{ accountLabel(entry.account) }}
+                      {{ entryMeta(entry) }}
                       <span class="badge" [class]="badge.tone">{{ badge.label }}</span>
                     </span>
                   </span>
@@ -274,12 +275,7 @@
       }
     </div>
 
-    <!-- Chart.js is loaded only once the chart scrolls into view, keeping it out of the first load. -->
-    @defer (on viewport) {
-      <app-expense-chart [categories]="month.expensesByCategory" />
-    } @placeholder {
-      <div class="chart-placeholder"></div>
-    }
+    <app-expense-chart [categories]="month.expensesByCategory" />
 
     <section class="card pots" aria-labelledby="pots-title">
       <div class="section-header" [class.open]="pots().length > 0">
@@ -344,7 +340,6 @@
         [month]="month()"
         [(saving)]="saving"
         (saved)="onPotChanged()"
-        (deleted)="onPotChanged()"
         (cancelled)="potDialog.close()"
       />
     } @else if (editing.form === 'allocation') {

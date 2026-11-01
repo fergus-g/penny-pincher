@@ -37,12 +37,13 @@ class PotRepositoryTest {
 	private EntryRepository entryRepository;
 
 	@Test
-	void aPotWithAContributionIsKnownToHaveOne() {
+	void aContributionKeepsItsPot() {
 		Long potId = savePot();
 		Entry repayment = new Entry(EntryType.EXPENSE, "Loans", null, BigDecimal.TEN, Account.AIB, MAR, null);
 		repayment.setPotId(potId);
-		this.entryRepository.save(repayment);
-		assertThat(this.entryRepository.existsByPotId(potId)).isTrue();
+		Long id = this.entryRepository.saveAndFlush(repayment).getId();
+		assertThat(this.entryRepository.findById(id)).hasValueSatisfying(
+				(saved) -> assertThat(saved.getPotId()).isEqualTo(potId));
 	}
 
 	@Test

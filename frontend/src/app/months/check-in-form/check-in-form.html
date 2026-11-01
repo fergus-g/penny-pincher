@@ -56,6 +56,11 @@
   </div>
 
   <footer class="form-footer">
+    @if (pot().checkedIn) {
+      <button type="button" class="secondary side-action" [disabled]="saving()" (click)="remove()">
+        Remove check-in
+      </button>
+    }
     <div class="actions">
       <button type="button" class="secondary" [disabled]="saving()" (click)="cancelled.emit()">
         Cancel

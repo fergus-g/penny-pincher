@@ -1,8 +1,7 @@
-import { DeferBlockState, TestBed } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { provideRouter } from '@angular/router';
-import { HttpErrorResponse } from '@angular/common/http';
-import { Observable, of, throwError } from 'rxjs';
+import { Observable, of } from 'rxjs';
 
 import { MonthApi } from '../month-api';
 import {
@@ -14,6 +13,7 @@ import {
   MonthSummary,
   Pot,
   PotBalance,
+  UpdatePotRequest,
 } from '../month.model';
 import { MonthPage } from './month-page';
 
@@ -75,6 +75,7 @@ class FakeMonthApi {
   pots: Pot[] = [];
   potBalances: Record<string, PotBalance[]> = {};
   checkIns: { potId: number; month: string; balance: number }[] = [];
+  removedCheckIns: { potId: number; month: string }[] = [];
   /** Each month's Allocation split, as the backend would calculate it. */
   allocations: Record<string, AllocationSummary> = {};
   savedAllocations: { month: string; request: AllocationRequest }[] = [];
@@ -106,10 +107,17 @@ class FakeMonthApi {
     return of(pot);
   }
 
-  /** Refuses like the backend does for a Pot with Contributions. */
-  deletePot(id: number): Observable<void> {
-    const detail = `Pot ${id} has Contributions; archive it instead`;
-    return throwError(() => new HttpErrorResponse({ status: 409, error: { detail } }));
+  updatePot(id: number, request: UpdatePotRequest): Observable<Pot> {
+    this.pots = this.pots.map((pot) => (pot.id === id ? { ...pot, ...request } : pot));
+    return of(this.pots.find((pot) => pot.id === id)!);
+  }
+
+  deleteCheckIn(potId: number, month: string): Observable<void> {
+    this.removedCheckIns.push({ potId, month });
+    this.potBalances[month] = (this.potBalances[month] ?? []).map((pot) =>
+      pot.id === potId ? { ...pot, checkedIn: false } : pot,
+    );
+    return of(undefined);
   }
 
   saveAllocation(month: string, request: AllocationRequest): Observable<unknown> {
@@ -194,7 +202,7 @@ async function addEntry(
 
 /**
  * Reports every observed element as visible straight away; jsdom has no layout. Used by the
- * new-Entry reveal and by the chart's `@defer (on viewport)`.
+ * new-Entry reveal.
  */
 class VisibleIntersectionObserver {
   constructor(private readonly callback: IntersectionObserverCallback) {}
@@ -207,10 +215,7 @@ class VisibleIntersectionObserver {
 
 const originalScrollIntoView = Element.prototype.scrollIntoView;
 
-// jsdom can't draw on a canvas, so the pie chart gets no context and draws nothing. Its
-// figures are still checked through the list beside it.
 beforeEach(() => {
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   vi.stubGlobal('IntersectionObserver', VisibleIntersectionObserver);
 });
 
@@ -445,15 +450,6 @@ describe('MonthPage transfers', () => {
 describe('MonthPage expense chart', () => {
   let api: FakeMonthApi;
 
-  /** Renders the page, then loads the chart's `@defer` block as if it had scrolled into view. */
-  async function renderWithChart(api: FakeMonthApi) {
-    const page = await render(api);
-    for (const block of await page.fixture.getDeferBlocks()) {
-      await block.render(DeferBlockState.Complete);
-    }
-    return page;
-  }
-
   beforeEach(() => {
     HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
       this.open = true;
@@ -461,49 +457,52 @@ describe('MonthPage expense chart', () => {
     api = new FakeMonthApi();
   });
 
-  /** Each legend row as "label amount percent". */
-  const slices = (el: HTMLElement) =>
+  /** Each bar as "label amount percent". */
+  const bars = (el: HTMLElement) =>
     Array.from(el.querySelectorAll('app-expense-chart li'), (li) =>
-      Array.from(li.querySelectorAll('span:not(.swatch)'), (span) => span.textContent!.trim()).join(
-        ' ',
-      ),
+      Array.from(li.querySelectorAll('.label, .amount, .percent'), (part) =>
+        part.textContent!.trim(),
+      ).join(' '),
+    );
+  const widths = (el: HTMLElement) =>
+    Array.from(
+      el.querySelectorAll<HTMLElement>('app-expense-chart .fill'),
+      (fill) => fill.style.width,
     );
 
-  it('list each category with its amount and share, largest first', async () => {
+  it('rank each category by amount, with its share, the largest bar filling the track', async () => {
     api.months['2026-11'] = [
       entry(1, 'INCOME', 'Salary', 3200),
       { ...entry(2, 'EXPENSE', 'Rent', 750), category: 'Housing' },
       { ...entry(3, 'EXPENSE', 'Big shop', 200), category: 'Groceries' },
       { ...entry(4, 'EXPENSE', 'Top-up', 50), category: 'Groceries' },
     ];
-    const { el } = await renderWithChart(api);
+    const { el } = await render(api);
 
-    expect(slices(el)).toEqual(['Housing €750.00 75%', 'Groceries €250.00 25%']);
-    expect(el.querySelector('app-expense-chart canvas')!.getAttribute('aria-label')).toBe(
-      'Pie chart of expenses: Housing 75%, Groceries 25%',
-    );
+    expect(bars(el)).toEqual(['Housing €750.00 75%', 'Groceries €250.00 25%']);
+    expect(widths(el)[0]).toBe('100%');
+    expect(parseFloat(widths(el)[1])).toBeCloseTo(33.33, 1);
   });
 
-  it('fold categories past the seventh into one Other slice, still summing to total Expenses', async () => {
+  it('show every category, so the bars sum to total Expenses', async () => {
     api.months['2026-11'] = Array.from({ length: 9 }, (_, i) => ({
       ...entry(i + 1, 'EXPENSE', `Thing ${i}`, 100 - i),
       category: `Category ${i}`,
     }));
-    const { el } = await renderWithChart(api);
+    const { el } = await render(api);
 
-    const rows = slices(el);
-    expect(rows).toHaveLength(7);
-    expect(rows.at(-1)).toBe('Other €279.00 32%');
-    const amounts = rows.map((row) => Number(row.match(/€([\d,.]+)/)![1].replace(',', '')));
+    const rows = bars(el);
+    expect(rows).toHaveLength(9);
+    const amounts = rows.map((row) => Number(row.split(' ')[2].replace('€', '').replace(',', '')));
     expect(amounts.reduce((a, b) => a + b, 0)).toBe(864);
   });
 
   it('say so when there are no Expenses', async () => {
     api.months['2026-11'] = [entry(1, 'INCOME', 'Salary', 3200)];
-    const { el } = await renderWithChart(api);
+    const { el } = await render(api);
 
     expect(el.querySelector('app-expense-chart')!.textContent).toContain('No expenses this month');
-    expect(el.querySelector('app-expense-chart canvas')).toBeNull();
+    expect(el.querySelector('app-expense-chart li')).toBeNull();
   });
 });
 
@@ -641,20 +640,56 @@ describe('MonthPage pots', () => {
     expect(potRows(page.el)[0]).toContain('Checked in');
   });
 
-  it('explain why a Pot with Contributions cannot be deleted', async () => {
+  it('archive a Pot from the month being viewed, with no way to delete it', async () => {
     const page = await render(api);
 
     page.el.querySelector<HTMLButtonElement>('section.pots .pot-main')!.click();
     await page.fixture.whenStable();
-    const deleteButton = () => page.el.querySelector<HTMLButtonElement>('dialog button.delete')!;
-    deleteButton().click();
-    await page.fixture.whenStable();
-    deleteButton().click();
+    expect(page.el.querySelector('dialog button.delete')).toBeNull();
+    const archive = page.el.querySelector<HTMLButtonElement>('dialog .side-action')!;
+    expect(archive.textContent).toContain('Archive from November 2026');
+    archive.click();
     await page.fixture.whenStable();
 
-    expect(page.el.querySelector('dialog [role="alert"]')!.textContent).toContain(
-      'archive it instead',
-    );
+    expect(api.pots[0].archivedFrom).toBe('2026-11');
+  });
+
+  it('remove a Check-in, but only from a month that has one', async () => {
+    const page = await render(api);
+    const checkInButtons = () =>
+      page.el.querySelectorAll<HTMLButtonElement>('section.pots .check-in-button');
+
+    checkInButtons()[0].click();
+    await page.fixture.whenStable();
+    expect(page.el.querySelector('dialog .side-action')).toBeNull();
+    page.el.querySelectorAll<HTMLButtonElement>('dialog .secondary')[0].click();
+    await page.fixture.whenStable();
+
+    checkInButtons()[1].click();
+    await page.fixture.whenStable();
+    const remove = page.el.querySelector<HTMLButtonElement>('dialog .side-action')!;
+    expect(remove.textContent).toContain('Remove check-in');
+    remove.click();
+    await page.fixture.whenStable();
+
+    expect(api.removedCheckIns).toEqual([{ potId: 2, month: '2026-11' }]);
+    expect(potRows(page.el)[1]).not.toContain('Checked in');
+  });
+
+  it('show the Pot a Contribution pays into, and the Account only when it is not AIB', async () => {
+    api.months['2026-11'] = [
+      { ...entry(1, 'EXPENSE', 'Car repayment', 250), category: 'Loans', potId: 1 },
+      { ...entry(2, 'EXPENSE', 'Netflix', 18, 'REVOLUT'), category: 'Subscriptions' },
+      { ...entry(3, 'EXPENSE', 'Mortgage', 1100), category: 'Housing' },
+    ];
+    const page = await render(api);
+    page.toggle('Expenses')!.click();
+    await page.fixture.whenStable();
+
+    const meta = page
+      .rows('Expenses')
+      .map((row) => row.querySelector('.entry-meta')!.firstChild!.textContent!.trim());
+    expect(meta).toEqual(['Loans → Car loan', 'Subscriptions · Revolut', 'Housing']);
   });
 
   it('let an Expense pay into a Pot, but not Income', async () => {
@@ -771,6 +806,7 @@ describe('MonthPage allocation', () => {
     const { el } = await render(api);
 
     expect(card(el)).toContain('Shortfall: Savings and Allowance are €100.00 more');
+    expect(card(el)).toContain("They're still transferred in full");
     expect(shares(el)).toEqual([
       'Savings €400.00 Rainy day',
       'Allowance €200.00 Revolut',

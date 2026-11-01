@@ -1,6 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, input, model, OnInit, output, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Observable } from 'rxjs';
 
 import { errorMessage } from '../error-message';
 import { MonthApi } from '../month-api';
@@ -50,9 +51,18 @@ export class CheckInForm implements OnInit {
       this.balance.markAsTouched();
       return;
     }
+    this.run(this.monthApi.checkIn(this.pot().id, this.month(), this.balance.value!));
+  }
+
+  /** Drops this month's Check-in, so the balance goes back to being calculated. */
+  protected remove(): void {
+    this.run(this.monthApi.deleteCheckIn(this.pot().id, this.month()));
+  }
+
+  private run(request: Observable<unknown>): void {
     this.saving.set(true);
     this.error.set(null);
-    this.monthApi.checkIn(this.pot().id, this.month(), this.balance.value!).subscribe({
+    request.subscribe({
       next: () => {
         this.saving.set(false);
         this.saved.emit();

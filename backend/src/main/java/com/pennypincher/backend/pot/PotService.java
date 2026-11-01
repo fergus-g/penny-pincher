@@ -61,25 +61,6 @@ public class PotService {
 		return PotResponse.from(pot);
 	}
 
-	/**
-	 * Only a Pot with no Contributions that no Allocation targets can go; otherwise archive it.
-	 * Its Check-ins go with it.
-	 */
-	@Transactional
-	public void delete(Long id) {
-		Pot pot = findPot(id);
-		if (this.entryRepository.existsByPotId(id)) {
-			throw new ResponseStatusException(HttpStatus.CONFLICT,
-					"Pot " + id + " has Contributions; archive it instead");
-		}
-		if (this.allocationRepository.existsBySavingsPotIdOrDebtPotId(id, id)) {
-			throw new ResponseStatusException(HttpStatus.CONFLICT,
-					"Pot " + id + " is targeted by an Allocation; archive it instead");
-		}
-		this.checkInRepository.deleteByPotId(id);
-		this.potRepository.delete(pot);
-	}
-
 	@Transactional(readOnly = true)
 	public List<CheckInResponse> checkIns(Long potId) {
 		findPot(potId);

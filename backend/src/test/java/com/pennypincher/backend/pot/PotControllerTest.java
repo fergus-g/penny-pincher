@@ -11,7 +11,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.pennypincher.backend.entry.Account;
 
@@ -19,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
@@ -58,15 +57,15 @@ class PotControllerTest {
 	}
 
 	@Test
-	void deletingAPotWithContributionsReturns409() {
-		willThrow(new ResponseStatusException(HttpStatus.CONFLICT, "Pot 1 has Contributions; archive it instead"))
-			.given(this.potService)
-			.delete(1L);
-		assertThat(this.mvc.delete().uri("/api/pots/1")).hasStatus(HttpStatus.CONFLICT)
-			.bodyJson()
-			.isLenientlyEqualTo("""
-					{"status":409,"detail":"Pot 1 has Contributions; archive it instead"}
-					""");
+	void potsCannotBeDeleted() {
+		assertThat(this.mvc.delete().uri("/api/pots/1")).hasStatus(HttpStatus.METHOD_NOT_ALLOWED);
+		verifyNoInteractions(this.potService);
+	}
+
+	@Test
+	void removingACheckInReturns204() {
+		assertThat(this.mvc.delete().uri("/api/pots/1/check-ins/2026-03")).hasStatus(HttpStatus.NO_CONTENT);
+		verify(this.potService).deleteCheckIn(1L, YearMonth.of(2026, 3));
 	}
 
 	@Test

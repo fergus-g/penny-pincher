@@ -40,12 +40,6 @@ public class PotController {
 		return this.potService.update(id, request);
 	}
 
-	@DeleteMapping("/api/pots/{id}")
-	@ResponseStatus(HttpStatus.NO_CONTENT)
-	public void delete(@PathVariable Long id) {
-		this.potService.delete(id);
-	}
-
 	@GetMapping("/api/pots/{id}/check-ins")
 	public List<CheckInResponse> checkIns(@PathVariable Long id) {
 		return this.potService.checkIns(id);

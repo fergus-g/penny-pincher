@@ -16,7 +16,4 @@ public interface EntryRepository extends JpaRepository<Entry, Long> {
 	@Query("select e.category from Entry e where e.type = :type")
 	List<String> findCategories(EntryType type);
 
-
-	boolean existsByPotId(Long potId);
-
 }

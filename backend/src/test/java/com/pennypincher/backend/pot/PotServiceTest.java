@@ -17,10 +17,8 @@ import com.pennypincher.backend.entry.EntryRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -66,29 +64,6 @@ class PotServiceTest {
 	}
 
 	@Test
-	void deletingAPotWithContributionsIsRejected() {
-		given(this.potRepository.findById(1L)).willReturn(Optional.of(pot(PotKind.LOAN, "10.00", JAN)));
-		given(this.entryRepository.existsByPotId(1L)).willReturn(true);
-		assertConflict(() -> this.potService.delete(1L));
-	}
-
-	@Test
-	void deletingAPotAnAllocationTargetsIsRejected() {
-		given(this.potRepository.findById(1L)).willReturn(Optional.of(pot(PotKind.LOAN, "10.00", JAN)));
-		given(this.allocationRepository.existsBySavingsPotIdOrDebtPotId(1L, 1L)).willReturn(true);
-		assertConflict(() -> this.potService.delete(1L));
-	}
-
-	@Test
-	void deletingAnUnusedPotTakesItsCheckInsWithIt() {
-		Pot pot = pot(PotKind.LOAN, "10.00", JAN);
-		given(this.potRepository.findById(1L)).willReturn(Optional.of(pot));
-		this.potService.delete(1L);
-		verify(this.checkInRepository).deleteByPotId(1L);
-		verify(this.potRepository).delete(pot);
-	}
-
-	@Test
 	void checkInBeforeTheOpeningMonthIsRejected() {
 		given(this.potRepository.findById(1L)).willReturn(Optional.of(pot(PotKind.SAVINGS, "10.00", FEB)));
 		CheckInRequest request = new CheckInRequest(BigDecimal.ONE);
@@ -124,10 +99,20 @@ class PotServiceTest {
 				(ex) -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
 	}
 
-	private void assertConflict(Runnable action) {
-		assertThatThrownBy(action::run).isInstanceOfSatisfying(ResponseStatusException.class,
-				(ex) -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
-		verify(this.potRepository, never()).delete(any(Pot.class));
+	@Test
+	void removingACheckInThatIsntThereIsNotFound() {
+		given(this.checkInRepository.findByPotIdAndMonth(1L, MAR)).willReturn(Optional.empty());
+		assertThatThrownBy(() -> this.potService.deleteCheckIn(1L, MAR)).isInstanceOfSatisfying(
+				ResponseStatusException.class,
+				(ex) -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+	}
+
+	@Test
+	void removingACheckInDeletesIt() {
+		BalanceCheckIn checkIn = new BalanceCheckIn(1L, MAR, new BigDecimal("4000.00"));
+		given(this.checkInRepository.findByPotIdAndMonth(1L, MAR)).willReturn(Optional.of(checkIn));
+		this.potService.deleteCheckIn(1L, MAR);
+		verify(this.checkInRepository).delete(checkIn);
 	}
 
 	private static Pot pot(PotKind kind, String openingBalance, YearMonth openingMonth) {
