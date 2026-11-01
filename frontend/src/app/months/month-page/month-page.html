@@ -275,7 +275,12 @@
       }
     </div>
 
-    <app-expense-chart [categories]="month.expensesByCategory" />
+    <!-- Chart.js is loaded only once the chart scrolls into view, keeping it out of the first load. -->
+    @defer (on viewport) {
+      <app-expense-chart [categories]="month.expensesByCategory" />
+    } @placeholder {
+      <div class="chart-placeholder"></div>
+    }
 
     <section class="card pots" aria-labelledby="pots-title">
       <div class="section-header" [class.open]="pots().length > 0">

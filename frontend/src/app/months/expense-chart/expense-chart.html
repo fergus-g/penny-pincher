@@ -1,19 +1,30 @@
 <section class="card" aria-labelledby="expense-chart-title">
   <h2 id="expense-chart-title">Expenses by category</h2>
-  @if (bars().length === 0) {
+  @if (slices().length === 0) {
     <p class="empty">No expenses this month</p>
   } @else {
-    <ul class="bars">
-      @for (bar of bars(); track bar.label) {
-        <li>
-          <span class="label">{{ bar.label }}</span>
-          <div class="track" aria-hidden="true">
-            <div class="fill" [style.width.%]="bar.width"></div>
-          </div>
-          <span class="amount">{{ bar.amount | currency: 'EUR' }}</span>
-          <span class="percent">{{ bar.percent }}%</span>
-        </li>
-      }
-    </ul>
+    <div class="body">
+      <div class="chart">
+        <canvas
+          baseChart
+          type="pie"
+          role="img"
+          [attr.aria-label]="'Pie chart of expenses: ' + summary()"
+          [data]="data()"
+          [options]="options"
+        ></canvas>
+      </div>
+      <!-- The legend, and the figures for anyone who can't read the chart. -->
+      <ul class="slices">
+        @for (slice of slices(); track slice.label) {
+          <li>
+            <span class="swatch" [style.background]="slice.colour" aria-hidden="true"></span>
+            <span class="label">{{ slice.label }}</span>
+            <span class="amount">{{ slice.amount | currency: 'EUR' }}</span>
+            <span class="percent">{{ slice.percent }}%</span>
+          </li>
+        }
+      </ul>
+    </div>
   }
 </section>
