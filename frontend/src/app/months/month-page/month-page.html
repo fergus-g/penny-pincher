@@ -24,37 +24,50 @@
     </div>
   </section>
 
-  <section class="columns">
-    <div>
-      <h2>Income</h2>
-      @for (entry of incomes(); track entry.id) {
-        <div class="entry">
-          <div>
-            <div>{{ entry.name ?? entry.category }}</div>
-            <small>{{ entry.category }} · {{ kind(entry) }}</small>
-          </div>
-          <div class="amount">{{ entry.amount | currency: 'EUR' }}</div>
-        </div>
-      } @empty {
-        <p class="message">None</p>
-      }
-    </div>
+  @if (deleteError(); as deleteError) {
+    <p class="message error">{{ deleteError }}</p>
+  }
 
-    <div>
-      <h2>Expense</h2>
-      @for (entry of expenses(); track entry.id) {
-        <div class="entry">
-          <div>
-            <div>{{ entry.name ?? entry.category }}</div>
-            <small>{{ entry.category }} · {{ kind(entry) }}</small>
-          </div>
-          <div class="amount">{{ entry.amount | currency: 'EUR' }}</div>
+  <section class="columns">
+    @for (column of columns(); track column.type) {
+      <div>
+        <div class="column-header">
+          <h2>{{ column.title }}</h2>
+          <button type="button" (click)="openAdd(column.type)" [attr.aria-label]="'Add ' + column.title">
+            +
+          </button>
         </div>
-      } @empty {
-        <p class="message">None</p>
-      }
-    </div>
+        @for (entry of column.entries; track entry.id) {
+          <div class="entry">
+            <div>
+              <div>{{ entryLabel(entry) }}</div>
+              <small>{{ entry.category }} · {{ kind(entry) }}</small>
+            </div>
+            <div class="entry-end">
+              <span class="amount">{{ entry.amount | currency: 'EUR' }}</span>
+              <button type="button" (click)="openEdit(entry)">Edit</button>
+              <button type="button" (click)="remove(entry)">Delete</button>
+            </div>
+          </div>
+        } @empty {
+          <p class="message">None</p>
+        }
+      </div>
+    }
   </section>
 } @else {
   <p class="message">Loading…</p>
 }
+
+<dialog #dialog (cancel)="onDialogCancel($event)" (close)="editing.set(null)">
+  @if (editing(); as editing) {
+    <app-entry-form
+      [type]="editing.type"
+      [entry]="editing.entry"
+      [month]="month()"
+      [(saving)]="saving"
+      (saved)="onSaved()"
+      (cancelled)="dialog.close()"
+    />
+  }
+</dialog>

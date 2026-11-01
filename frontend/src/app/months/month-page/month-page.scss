@@ -53,8 +53,31 @@
   gap: 2rem;
 
   h2 {
-    margin: 0 0 0.5rem;
+    margin: 0;
     font-size: 1.25rem;
+  }
+}
+
+.column-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.entry-end {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+dialog {
+  border: 1px solid #ccc;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+
+  &::backdrop {
+    background: rgb(0 0 0 / 0.3);
   }
 }
 
