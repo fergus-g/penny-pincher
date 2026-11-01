@@ -117,6 +117,45 @@ export class MonthPage {
     });
   });
 
+  /**
+   * With an Allocation: where every euro of Income goes, as a stacked bar of Expenses, Savings,
+   * Allowance and Debt Repayment. In a Shortfall the segments fill Income in that order and what
+   * doesn't fit is a red overflow past it. Null without an Allocation or with no Income, when the
+   * plain spent bar shows instead.
+   */
+  protected readonly incomeBar = computed(() => {
+    const month = this.summary.hasValue() ? this.summary.value() : null;
+    const split = month?.allocation;
+    if (!month || !split || month.totalIncome <= 0) {
+      return null;
+    }
+    const income = month.totalIncome;
+    const parts = [
+      { part: 'expenses', label: 'Expenses', amount: month.totalExpenses },
+      { part: 'savings', label: 'Savings', amount: split.savings },
+      { part: 'allowance', label: 'Allowance', amount: split.allowance },
+      { part: 'debt', label: 'Debt Repayment', amount: split.debtRepayment },
+    ];
+    const over = Math.max(0, parts.reduce((sum, part) => sum + part.amount, 0) - income);
+    // The bar spans Income plus any overflow, so the overflow shows past where Income ends.
+    const scale = income + over;
+    let room = income;
+    const segments = parts.map((part) => {
+      const inside = Math.min(part.amount, room);
+      room -= inside;
+      return { ...part, width: (inside / scale) * 100 };
+    });
+    const described = parts.map((part) => `${part.label} ${euros.format(part.amount)}`).join(', ');
+    return {
+      segments,
+      over,
+      overWidth: (over / scale) * 100,
+      label:
+        `Income ${euros.format(income)}: ${described}` +
+        (over > 0 ? `; Shortfall: ${euros.format(over)} more than Income` : ''),
+    };
+  });
+
   /** Share of income spent, for the summary bar; null when there's no income to compare with. */
   protected readonly spent = computed(() => {
     if (!this.summary.hasValue() || this.summary.value().totalIncome <= 0) {

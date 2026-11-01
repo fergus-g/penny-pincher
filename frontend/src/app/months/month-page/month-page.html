@@ -73,7 +73,39 @@
             </div>
           </div>
         </div>
-        @if (spent(); as spent) {
+        @if (incomeBar(); as bar) {
+          <div class="spent">
+            <div class="bar stacked" role="img" [attr.aria-label]="bar.label">
+              @for (segment of bar.segments; track segment.part) {
+                @if (segment.width > 0) {
+                  <div
+                    class="segment"
+                    [attr.data-part]="segment.part"
+                    [style.width.%]="segment.width"
+                  ></div>
+                }
+              }
+              @if (bar.over > 0) {
+                <div class="segment" data-part="over" [style.width.%]="bar.overWidth"></div>
+              }
+            </div>
+            <!-- The figures, so no segment relies on colour alone. -->
+            <ul class="bar-legend" aria-hidden="true">
+              @for (segment of bar.segments; track segment.part) {
+                <li>
+                  <span class="swatch" [attr.data-part]="segment.part"></span>
+                  {{ segment.label }} <strong>{{ segment.amount | currency: 'EUR' }}</strong>
+                </li>
+              }
+              @if (bar.over > 0) {
+                <li class="over">
+                  <span class="swatch" data-part="over"></span>
+                  Over Income by <strong>{{ bar.over | currency: 'EUR' }}</strong>
+                </li>
+              }
+            </ul>
+          </div>
+        } @else if (spent(); as spent) {
           <div class="spent">
             <div
               class="bar"
