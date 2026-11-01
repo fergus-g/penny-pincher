@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, input, model, OnInit, output, signal } from '@angular/core';
+import { rxResource } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { MonthApi } from '../month-api';
@@ -43,6 +44,16 @@ export class EntryForm implements OnInit {
   readonly entry = input<Entry | null>(null);
   /** Recently used categories, offered as quick picks when adding. */
   readonly categories = input<string[]>([]);
+
+  /** Every category used before on this type. */
+  private readonly knownCategories = rxResource({
+    params: () => this.type(),
+    stream: ({ params }) => this.monthApi.getCategories(params),
+  });
+  /** Autocomplete while typing a category; none if they couldn't be loaded. */
+  protected readonly suggestions = computed(() =>
+    this.knownCategories.hasValue() ? this.knownCategories.value() : [],
+  );
 
   /** The Entry as the backend saved it. */
   readonly saved = output<Entry>();

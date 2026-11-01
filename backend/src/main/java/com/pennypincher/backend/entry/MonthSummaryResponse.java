@@ -10,5 +10,6 @@ public record MonthSummaryResponse(
 		BigDecimal totalIncome,
 		BigDecimal totalExpenses,
 		BigDecimal remainder,
-		List<Transfer> transfers) {
+		List<Transfer> transfers,
+		List<CategoryTotal> expensesByCategory) {
 }

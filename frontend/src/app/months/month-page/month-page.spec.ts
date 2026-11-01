@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { DeferBlockState, TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { provideRouter } from '@angular/router';
 import { Observable, of } from 'rxjs';
@@ -31,6 +31,10 @@ function summary(month: string, entries: Entry[]): MonthSummary {
   const total = (type: Entry['type'], on = entries) =>
     on.filter((e) => e.type === type).reduce((sum, e) => sum + e.amount, 0);
   const revolut = entries.filter((e) => e.account === 'REVOLUT');
+  const byCategory = new Map<string, number>();
+  for (const e of entries.filter((e) => e.type === 'EXPENSE')) {
+    byCategory.set(e.category, (byCategory.get(e.category) ?? 0) + e.amount);
+  }
   return {
     month,
     entries,
@@ -40,6 +44,9 @@ function summary(month: string, entries: Entry[]): MonthSummary {
     transfers: [
       { account: 'REVOLUT', amount: total('EXPENSE', revolut) - total('INCOME', revolut) },
     ],
+    expensesByCategory: Array.from(byCategory, ([category, amount]) => ({ category, amount })).sort(
+      (a, b) => b.amount - a.amount,
+    ),
   };
 }
 
@@ -50,6 +57,11 @@ class FakeMonthApi {
 
   getMonth(month: string): Observable<MonthSummary> {
     return of(summary(month, this.months[month] ?? []));
+  }
+
+  getCategories(type: Entry['type']): Observable<string[]> {
+    const all = Object.values(this.months).flat();
+    return of([...new Set(all.filter((e) => e.type === type).map((e) => e.category))].sort());
   }
 
   createEntry(request: CreateEntryRequest): Observable<Entry> {
@@ -113,16 +125,32 @@ async function addEntry(
   await page.fixture.whenStable();
 }
 
-/** Reports every observed element as visible straight away; jsdom has no layout. */
+/**
+ * Reports every observed element as visible straight away; jsdom has no layout. Used by the
+ * new-Entry reveal and by the chart's `@defer (on viewport)`.
+ */
 class VisibleIntersectionObserver {
   constructor(private readonly callback: IntersectionObserverCallback) {}
   observe(target: Element) {
     this.callback([{ target, isIntersecting: true } as IntersectionObserverEntry], this as never);
   }
+  unobserve() {}
   disconnect() {}
 }
 
 const originalScrollIntoView = Element.prototype.scrollIntoView;
+
+// jsdom can't draw on a canvas, so the pie chart gets no context and draws nothing. Its
+// figures are still checked through the list beside it.
+beforeEach(() => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  vi.stubGlobal('IntersectionObserver', VisibleIntersectionObserver);
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe('MonthPage sections', () => {
   beforeEach(() => {
@@ -344,5 +372,95 @@ describe('MonthPage transfers', () => {
     expect(api.months['2026-11'][0].account).toBe('REVOLUT');
     expect(page.rows('Expenses')[0].textContent).toContain('Subscriptions · Revolut');
     expect(transferLines(page.el)).toEqual(['Transfer €12.00 to Revolut']);
+  });
+});
+
+describe('MonthPage expense chart', () => {
+  let api: FakeMonthApi;
+
+  /** Renders the page, then loads the chart's `@defer` block as if it had scrolled into view. */
+  async function renderWithChart(api: FakeMonthApi) {
+    const page = await render(api);
+    for (const block of await page.fixture.getDeferBlocks()) {
+      await block.render(DeferBlockState.Complete);
+    }
+    return page;
+  }
+
+  beforeEach(() => {
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true;
+    };
+    api = new FakeMonthApi();
+  });
+
+  /** Each legend row as "label amount percent". */
+  const slices = (el: HTMLElement) =>
+    Array.from(el.querySelectorAll('app-expense-chart li'), (li) =>
+      Array.from(li.querySelectorAll('span:not(.swatch)'), (span) => span.textContent!.trim()).join(
+        ' ',
+      ),
+    );
+
+  it('list each category with its amount and share, largest first', async () => {
+    api.months['2026-11'] = [
+      entry(1, 'INCOME', 'Salary', 3200),
+      { ...entry(2, 'EXPENSE', 'Rent', 750), category: 'Housing' },
+      { ...entry(3, 'EXPENSE', 'Big shop', 200), category: 'Groceries' },
+      { ...entry(4, 'EXPENSE', 'Top-up', 50), category: 'Groceries' },
+    ];
+    const { el } = await renderWithChart(api);
+
+    expect(slices(el)).toEqual(['Housing €750.00 75%', 'Groceries €250.00 25%']);
+    expect(el.querySelector('app-expense-chart canvas')!.getAttribute('aria-label')).toBe(
+      'Pie chart of expenses: Housing 75%, Groceries 25%',
+    );
+  });
+
+  it('fold categories past the seventh into one Other slice, still summing to total Expenses', async () => {
+    api.months['2026-11'] = Array.from({ length: 9 }, (_, i) => ({
+      ...entry(i + 1, 'EXPENSE', `Thing ${i}`, 100 - i),
+      category: `Category ${i}`,
+    }));
+    const { el } = await renderWithChart(api);
+
+    const rows = slices(el);
+    expect(rows).toHaveLength(7);
+    expect(rows.at(-1)).toBe('Other €279.00 32%');
+    const amounts = rows.map((row) => Number(row.match(/€([\d,.]+)/)![1].replace(',', '')));
+    expect(amounts.reduce((a, b) => a + b, 0)).toBe(864);
+  });
+
+  it('say so when there are no Expenses', async () => {
+    api.months['2026-11'] = [entry(1, 'INCOME', 'Salary', 3200)];
+    const { el } = await renderWithChart(api);
+
+    expect(el.querySelector('app-expense-chart')!.textContent).toContain('No expenses this month');
+    expect(el.querySelector('app-expense-chart canvas')).toBeNull();
+  });
+});
+
+describe('Entry form category autocomplete', () => {
+  beforeEach(() => {
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true;
+    };
+  });
+
+  it('suggests categories already used on that type of Entry, from any month', async () => {
+    const api = new FakeMonthApi();
+    api.months['2026-11'] = [entry(1, 'INCOME', 'Salary', 3200)];
+    api.months['2026-10'] = [{ ...entry(2, 'EXPENSE', 'Bus', 40), category: 'Transport' }];
+    const page = await render(api);
+
+    page.section('Expenses').querySelector<HTMLButtonElement>('.add-button')!.click();
+    await page.fixture.whenStable();
+
+    const input = page.el.querySelector<HTMLInputElement>('dialog #entry-category')!;
+    const options = Array.from(
+      page.el.querySelectorAll<HTMLOptionElement>(`datalist#${input.getAttribute('list')} option`),
+      (option) => option.value,
+    );
+    expect(options).toEqual(['Transport']);
   });
 });

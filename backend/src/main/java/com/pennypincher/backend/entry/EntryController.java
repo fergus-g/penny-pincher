@@ -1,6 +1,7 @@
 package com.pennypincher.backend.entry;
 
 import java.time.YearMonth;
+import java.util.List;
 
 import jakarta.validation.Valid;
 
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,6 +40,11 @@ public class EntryController {
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@PathVariable Long id) {
 		this.entryService.delete(id);
+	}
+
+	@GetMapping("/api/categories")
+	public List<String> getCategories(@RequestParam EntryType type) {
+		return this.entryService.getCategories(type);
 	}
 
 	@GetMapping("/api/months/{month}")

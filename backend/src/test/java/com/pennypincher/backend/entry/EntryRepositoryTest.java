@@ -86,6 +86,15 @@ class EntryRepositoryTest {
 		assertThat(march.get(march.size() - 1).getAccount()).isEqualTo(Account.AIB);
 	}
 
+	@Test
+	void findCategoriesReturnsOnePerEntryOfThatTypeOnly() {
+		this.entryRepository.save(new Entry(EntryType.INCOME, "Salary-test", null, BigDecimal.TEN, Account.AIB, MAR,
+				null));
+		List<String> categories = this.entryRepository.findCategories(EntryType.EXPENSE);
+		assertThat(categories).filteredOn("Test"::equals).hasSizeGreaterThanOrEqualTo(3);
+		assertThat(categories).doesNotContain("Salary-test");
+	}
+
 	private Long save(String name, YearMonth startMonth, YearMonth endMonth) {
 		Entry entry = new Entry(EntryType.EXPENSE, "Test", name, new BigDecimal("10.00"), Account.AIB, startMonth,
 				endMonth);
