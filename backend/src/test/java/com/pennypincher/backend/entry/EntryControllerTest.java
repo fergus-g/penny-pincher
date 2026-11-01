@@ -59,12 +59,13 @@ class EntryControllerTest {
 			.uri("/api/entries")
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"type":"EXPENSE","category":" ","amount":-5,"startMonth":"2026-10"}
+					{"type":"EXPENSE","category":" ","amount":-5,"startMonth":"2026-10","dueDay":32}
 					"""))
 			.hasStatus(HttpStatus.BAD_REQUEST)
 			.bodyJson()
 			.isLenientlyEqualTo("""
-					{"errors":{"category":"must not be blank","amount":"must be greater than 0"}}
+					{"errors":{"category":"must not be blank","amount":"must be greater than 0",
+					"dueDay":"must be less than or equal to 31"}}
 					""");
 		verifyNoInteractions(this.entryService);
 	}
@@ -136,8 +137,7 @@ class EntryControllerTest {
 
 	private static EntryResponse laptop() {
 		return new EntryResponse(1L, EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), Account.REVOLUT,
-				OCT, OCT, null,
-				Instant.parse("2026-10-31T21:30:43Z"));
+				OCT, OCT, null, 31, 31, Instant.parse("2026-10-31T21:30:43Z"));
 	}
 
 }

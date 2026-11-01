@@ -35,6 +35,8 @@ function entry(
     startMonth: '2026-11',
     endMonth: null,
     potId: null,
+    dueDay: null,
+    dueDayInMonth: null,
     createdAt: '2026-11-01T00:00:00Z',
   };
 }
@@ -72,6 +74,12 @@ function summary(
     pots,
     allocation,
   };
+}
+
+/** [year, month number] of a "yyyy-MM" month; day 0 of the next month is this month's last day. */
+function startOf(month: string): [number, number] {
+  const [year, monthNumber] = month.split('-').map(Number);
+  return [year, monthNumber];
 }
 
 /** A month API backed by an in-memory list of months, so the page sees real responses. */
@@ -155,6 +163,12 @@ class FakeMonthApi {
       ),
       category: request.category,
       potId: request.potId,
+      dueDay: request.dueDay,
+      // Clamped to the start month's length, as the backend does.
+      dueDayInMonth:
+        request.dueDay === null
+          ? null
+          : Math.min(request.dueDay, new Date(...startOf(request.startMonth), 0).getDate()),
     };
     this.months[request.startMonth] = [...(this.months[request.startMonth] ?? []), created];
     return of(created);
@@ -192,7 +206,7 @@ async function render(api: FakeMonthApi, month = '2026-11') {
 async function addEntry(
   page: Awaited<ReturnType<typeof render>>,
   title: string,
-  values: { category: string; name: string; amount: string; account?: string },
+  values: { category: string; name: string; amount: string; account?: string; dueDay?: string },
 ) {
   page.section(title).querySelector<HTMLButtonElement>('.add-button')!.click();
   await page.fixture.whenStable();
@@ -385,6 +399,72 @@ describe('MonthPage sections', () => {
     expect(page.rows('Expenses').map((row) => row.textContent)).toEqual([
       expect.stringContaining('Groceries'),
     ]);
+  });
+});
+
+describe('MonthPage due days', () => {
+  let api: FakeMonthApi;
+
+  beforeEach(() => {
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+      this.open = false;
+    };
+    api = new FakeMonthApi();
+  });
+
+  const due = (id: number, name: string, day: number | null): Entry => ({
+    ...entry(id, 'EXPENSE', name, 10),
+    dueDay: day,
+    dueDayInMonth: day,
+  });
+
+  it('sort Expenses by Due Day, with no Due Day last, and show each one', async () => {
+    api.months['2026-11'] = [
+      due(1, 'Gym', 15),
+      due(2, 'Takeaway', null),
+      due(3, 'Mortgage', 1),
+      due(4, 'Car loan', 28),
+      due(5, 'Gift', null),
+    ];
+    const page = await render(api);
+    page.toggle('Expenses')!.click();
+    await page.fixture.whenStable();
+
+    const rows = page.rows('Expenses');
+    expect(rows.map((row) => row.querySelector('.entry-name')!.textContent!.trim())).toEqual([
+      'Edit Mortgage',
+      'Edit Gym',
+      'Edit Car loan',
+      'Edit Takeaway',
+      'Edit Gift',
+    ]);
+    expect(rows[0].querySelector('.entry-meta')!.textContent).toContain('Housing · Due 1st');
+    expect(rows[3].querySelector('.entry-meta')!.textContent).not.toContain('Due');
+  });
+
+  it('save a Due Day on an Expense, falling on the last day of a shorter month', async () => {
+    const page = await render(api);
+
+    await addEntry(page, 'Expenses', {
+      category: 'Housing',
+      name: 'Rent',
+      amount: '1000',
+      dueDay: '31',
+    });
+
+    expect(api.months['2026-11'][0]).toMatchObject({ dueDay: 31, dueDayInMonth: 30 });
+    expect(page.rows('Expenses')[0].textContent).toContain('Due 30th');
+  });
+
+  it('offer no Due Day for Income', async () => {
+    const page = await render(api);
+
+    page.section('Income').querySelector<HTMLButtonElement>('.add-button')!.click();
+    await page.fixture.whenStable();
+    expect(page.el.querySelector('dialog #entry-due-day')).toBeNull();
   });
 });
 
