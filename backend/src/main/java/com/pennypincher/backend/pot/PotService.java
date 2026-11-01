@@ -1,17 +1,14 @@
 package com.pennypincher.backend.pot;
 
-import java.math.BigDecimal;
 import java.time.YearMonth;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.pennypincher.backend.entry.Entry;
+import com.pennypincher.backend.allocation.AllocationRepository;
 import com.pennypincher.backend.entry.EntryRepository;
 
 @Service
@@ -23,11 +20,14 @@ public class PotService {
 
 	private final EntryRepository entryRepository;
 
+	private final AllocationRepository allocationRepository;
+
 	public PotService(PotRepository potRepository, BalanceCheckInRepository checkInRepository,
-			EntryRepository entryRepository) {
+			EntryRepository entryRepository, AllocationRepository allocationRepository) {
 		this.potRepository = potRepository;
 		this.checkInRepository = checkInRepository;
 		this.entryRepository = entryRepository;
+		this.allocationRepository = allocationRepository;
 	}
 
 	/** Every Pot, archived ones included. */
@@ -61,13 +61,20 @@ public class PotService {
 		return PotResponse.from(pot);
 	}
 
-	/** Only a Pot with no Contributions can go; otherwise archive it. Its Check-ins go with it. */
+	/**
+	 * Only a Pot with no Contributions that no Allocation targets can go; otherwise archive it.
+	 * Its Check-ins go with it.
+	 */
 	@Transactional
 	public void delete(Long id) {
 		Pot pot = findPot(id);
 		if (this.entryRepository.existsByPotId(id)) {
 			throw new ResponseStatusException(HttpStatus.CONFLICT,
 					"Pot " + id + " has Contributions; archive it instead");
+		}
+		if (this.allocationRepository.existsBySavingsPotIdOrDebtPotId(id, id)) {
+			throw new ResponseStatusException(HttpStatus.CONFLICT,
+					"Pot " + id + " is targeted by an Allocation; archive it instead");
 		}
 		this.checkInRepository.deleteByPotId(id);
 		this.potRepository.delete(pot);
@@ -100,15 +107,11 @@ public class PotService {
 		this.checkInRepository.delete(checkIn);
 	}
 
-	/** Each Pot in use in {@code month}, with its balance at the end of that month. */
+	/** Each Pot in use in {@code month} with its end-of-month balance, and the month's Allocation. */
 	@Transactional(readOnly = true)
-	public List<PotBalance> balancesIn(YearMonth month) {
-		return this.potRepository.findAllByOrderById()
-			.stream()
-			.filter((pot) -> pot.isActiveIn(month))
-			.map((pot) -> balanceIn(pot, month, this.checkInRepository.findByPotIdOrderByMonth(pot.getId()),
-					this.entryRepository.findByPotId(pot.getId())))
-			.toList();
+	public PotMonth monthOf(YearMonth month) {
+		return MonthLedger.run(month, this.potRepository.findAllByOrderById(), this.checkInRepository.findAll(),
+				this.entryRepository.findAll(), this.allocationRepository.findAllByOrderByEffectiveFrom());
 	}
 
 	/** Rejects a Contribution to a Pot that doesn't exist. */
@@ -117,30 +120,6 @@ public class PotService {
 		if (!this.potRepository.existsById(potId)) {
 			throw badRequest("Pot " + potId + " not found");
 		}
-	}
-
-	/**
-	 * Start from the latest Check-in on or before {@code month}, or else the opening balance, both
-	 * end-of-month figures. Then apply each later month's Contributions up to {@code month}: they
-	 * add to a Savings Pot and pay down a Debt Pot, which never goes below zero.
-	 */
-	static PotBalance balanceIn(Pot pot, YearMonth month, List<BalanceCheckIn> checkIns,
-			List<Entry> contributions) {
-		Optional<BalanceCheckIn> latest = checkIns.stream()
-			.filter((checkIn) -> !checkIn.getMonth().isAfter(month))
-			.max(Comparator.comparing(BalanceCheckIn::getMonth));
-		YearMonth from = latest.map(BalanceCheckIn::getMonth).orElse(pot.getOpeningMonth());
-		BigDecimal balance = latest.map(BalanceCheckIn::getBalance).orElse(pot.getOpeningBalance());
-		for (YearMonth next = from.plusMonths(1); !next.isAfter(month); next = next.plusMonths(1)) {
-			YearMonth current = next;
-			BigDecimal paid = contributions.stream()
-				.filter((entry) -> entry.isActiveIn(current))
-				.map(Entry::getAmount)
-				.reduce(BigDecimal.ZERO, BigDecimal::add);
-			balance = pot.getKind().isDebt() ? balance.subtract(paid).max(BigDecimal.ZERO) : balance.add(paid);
-		}
-		boolean checkedIn = latest.isPresent() && latest.get().getMonth().equals(month);
-		return new PotBalance(pot.getId(), pot.getName(), pot.getKind(), pot.getAccount(), balance, checkedIn);
 	}
 
 	private Pot findPot(Long id) {

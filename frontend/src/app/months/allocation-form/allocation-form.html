@@ -1,0 +1,121 @@
+<form [formGroup]="form" (ngSubmit)="submit()" aria-labelledby="allocation-form-title">
+  <header class="form-header">
+    <div class="heading">
+      <h2 id="allocation-form-title">Allocate what's left over</h2>
+      <p class="subtitle">{{ subtitle() }}</p>
+    </div>
+    <button
+      type="button"
+      class="close"
+      aria-label="Close"
+      [disabled]="saving()"
+      (click)="cancelled.emit()"
+    >
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        aria-hidden="true"
+      >
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </button>
+  </header>
+
+  <div class="form-body">
+    <div class="pair">
+      <div class="field">
+        <label for="allocation-savings">Savings</label>
+        <div class="money">
+          <span aria-hidden="true">€</span>
+          <input
+            id="allocation-savings"
+            type="number"
+            inputmode="decimal"
+            formControlName="savings"
+            min="0"
+            step="0.01"
+          />
+        </div>
+        @if (form.controls.savings.touched && form.controls.savings.invalid) {
+          <small class="error">Enter 0 or more, at most 2 decimal places</small>
+        }
+      </div>
+      <div class="field">
+        <label for="allocation-savings-pot">Into pot</label>
+        <select id="allocation-savings-pot" class="text-input" formControlName="savingsPotId">
+          <option [ngValue]="null">Not assigned</option>
+          @for (pot of savingsPots(); track pot.id) {
+            <option [ngValue]="pot.id">{{ pot.name }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <div class="pair">
+      <div class="field">
+        <label for="allocation-allowance">Allowance</label>
+        <div class="money">
+          <span aria-hidden="true">€</span>
+          <input
+            id="allocation-allowance"
+            type="number"
+            inputmode="decimal"
+            formControlName="allowance"
+            min="0"
+            step="0.01"
+          />
+        </div>
+        @if (form.controls.allowance.touched && form.controls.allowance.invalid) {
+          <small class="error">Enter 0 or more, at most 2 decimal places</small>
+        }
+      </div>
+      <div class="field">
+        <label for="allocation-allowance-account">Into account</label>
+        <select
+          id="allocation-allowance-account"
+          class="text-input"
+          formControlName="allowanceAccount"
+        >
+          @for (account of accounts; track account.value) {
+            <option [value]="account.value">{{ account.label }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="allocation-debt-pot">Debt Repayment pays down</label>
+      <select id="allocation-debt-pot" class="text-input" formControlName="debtPotId">
+        <option [ngValue]="null">Not assigned</option>
+        @for (pot of debtPots(); track pot.id) {
+          <option [ngValue]="pot.id">{{ pot.name }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="note" role="note">
+      Debt Repayment is whatever is left over after Savings and Allowance. Once the debt is paid
+      off, the rest goes to the Savings pot.
+    </div>
+
+    @if (error(); as error) {
+      <p class="error" role="alert">{{ error }}</p>
+    }
+  </div>
+
+  <footer class="form-footer">
+    <div class="actions">
+      <button type="button" class="secondary" [disabled]="saving()" (click)="cancelled.emit()">
+        Cancel
+      </button>
+      <button type="submit" class="primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : 'Save allocation' }}
+      </button>
+    </div>
+  </footer>
+</form>

@@ -61,6 +61,8 @@ export interface MonthSummary {
   expensesByCategory: CategoryTotal[];
   /** Each Pot in use this month, with its end-of-month balance. */
   pots: PotBalance[];
+  /** How this month's Remainder is split; null before the first Allocation starts. */
+  allocation: AllocationSummary | null;
 }
 
 export interface CategoryTotal {
@@ -131,4 +133,34 @@ export interface PotBalance {
   balance: number;
   /** True when this month has a Balance Check-in rather than a calculated balance. */
   checkedIn: boolean;
+}
+
+/** One month's split of the Remainder. A null Pot means that share is unassigned. */
+export interface AllocationSummary {
+  /** The month this Allocation started. */
+  effectiveFrom: string;
+  savings: number;
+  allowance: number;
+  allowanceAccount: Account;
+  /** Whatever is left after Savings and Allowance; never below zero. */
+  debtRepayment: number;
+  /** Savings plus Allowance exceed the Remainder; neither is reduced. */
+  shortfall: boolean;
+  savingsPotId: number | null;
+  savingsPotName: string | null;
+  debtPotId: number | null;
+  debtPotName: string | null;
+  /** Debt Repayment the cleared Debt Pot couldn't take, sent to the Savings Pot instead. */
+  debtOverflow: number;
+  /** When the Debt Pot reached zero, if it's at zero this month. */
+  debtPaidOffIn: string | null;
+}
+
+/** Body of PUT /api/months/{month}/allocation. */
+export interface AllocationRequest {
+  savings: number;
+  allowance: number;
+  allowanceAccount: Account;
+  savingsPotId: number | null;
+  debtPotId: number | null;
 }

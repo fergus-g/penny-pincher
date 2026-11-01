@@ -6,6 +6,8 @@ import { Observable, of, throwError } from 'rxjs';
 
 import { MonthApi } from '../month-api';
 import {
+  AllocationRequest,
+  AllocationSummary,
   CreateEntryRequest,
   CreatePotRequest,
   Entry,
@@ -36,7 +38,12 @@ function entry(
   };
 }
 
-function summary(month: string, entries: Entry[], pots: PotBalance[] = []): MonthSummary {
+function summary(
+  month: string,
+  entries: Entry[],
+  pots: PotBalance[] = [],
+  allocation: AllocationSummary | null = null,
+): MonthSummary {
   const total = (type: Entry['type'], on = entries) =>
     on.filter((e) => e.type === type).reduce((sum, e) => sum + e.amount, 0);
   const revolut = entries.filter((e) => e.account === 'REVOLUT');
@@ -57,6 +64,7 @@ function summary(month: string, entries: Entry[], pots: PotBalance[] = []): Mont
       (a, b) => b.amount - a.amount,
     ),
     pots,
+    allocation,
   };
 }
 
@@ -67,10 +75,20 @@ class FakeMonthApi {
   pots: Pot[] = [];
   potBalances: Record<string, PotBalance[]> = {};
   checkIns: { potId: number; month: string; balance: number }[] = [];
+  /** Each month's Allocation split, as the backend would calculate it. */
+  allocations: Record<string, AllocationSummary> = {};
+  savedAllocations: { month: string; request: AllocationRequest }[] = [];
   nextId = 100;
 
   getMonth(month: string): Observable<MonthSummary> {
-    return of(summary(month, this.months[month] ?? [], this.potBalances[month] ?? []));
+    return of(
+      summary(
+        month,
+        this.months[month] ?? [],
+        this.potBalances[month] ?? [],
+        this.allocations[month] ?? null,
+      ),
+    );
   }
 
   getPots(): Observable<Pot[]> {
@@ -92,6 +110,11 @@ class FakeMonthApi {
   deletePot(id: number): Observable<void> {
     const detail = `Pot ${id} has Contributions; archive it instead`;
     return throwError(() => new HttpErrorResponse({ status: 409, error: { detail } }));
+  }
+
+  saveAllocation(month: string, request: AllocationRequest): Observable<unknown> {
+    this.savedAllocations.push({ month, request });
+    return of({ effectiveFrom: month, ...request });
   }
 
   checkIn(potId: number, month: string, balance: number): Observable<unknown> {
@@ -655,5 +678,154 @@ describe('MonthPage pots', () => {
     page.section('Income').querySelector<HTMLButtonElement>('.add-button')!.click();
     await page.fixture.whenStable();
     expect(page.el.querySelector('dialog #entry-pot')).toBeNull();
+  });
+});
+
+describe('MonthPage allocation', () => {
+  let api: FakeMonthApi;
+
+  beforeEach(() => {
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+      this.open = false;
+    };
+    api = new FakeMonthApi();
+    api.months['2026-11'] = [entry(1, 'INCOME', 'Salary', 3000), entry(2, 'EXPENSE', 'Rent', 2000)];
+    api.pots = [
+      {
+        id: 1,
+        name: 'Car loan',
+        kind: 'LOAN',
+        account: 'AIB',
+        openingBalance: 5000,
+        openingMonth: '2026-01',
+        archivedFrom: null,
+      },
+      {
+        id: 2,
+        name: 'Rainy day',
+        kind: 'SAVINGS',
+        account: 'REVOLUT',
+        openingBalance: 0,
+        openingMonth: '2026-01',
+        archivedFrom: null,
+      },
+    ];
+  });
+
+  /** The Allocation card's text, whitespace collapsed. */
+  const card = (el: HTMLElement) =>
+    el.querySelector('section.allocation')!.textContent!.replace(/\s+/g, ' ');
+  /** Each share as "name amount target". */
+  const shares = (el: HTMLElement) =>
+    Array.from(el.querySelectorAll('section.allocation dl > div'), (share) =>
+      Array.from(share.querySelectorAll('dt, strong, .target'), (part) =>
+        part.textContent!.trim(),
+      ).join(' '),
+    );
+
+  function split(overrides: Partial<AllocationSummary> = {}): AllocationSummary {
+    return {
+      effectiveFrom: '2026-11',
+      savings: 400,
+      allowance: 200,
+      allowanceAccount: 'REVOLUT',
+      debtRepayment: 400,
+      shortfall: false,
+      savingsPotId: 2,
+      savingsPotName: 'Rainy day',
+      debtPotId: 1,
+      debtPotName: 'Car loan',
+      debtOverflow: 0,
+      debtPaidOffIn: null,
+      ...overrides,
+    };
+  }
+
+  it('prompt to set one up when there is none', async () => {
+    const page = await render(api);
+
+    expect(card(page.el)).toContain('Set up your Allocation');
+    page.el.querySelector<HTMLButtonElement>('section.allocation .add-button')!.click();
+    await page.fixture.whenStable();
+    expect(page.el.querySelector('dialog app-allocation-form')).not.toBeNull();
+  });
+
+  it('show Savings, Allowance and Debt Repayment with where each goes', async () => {
+    api.allocations['2026-11'] = split();
+    const { el } = await render(api);
+
+    expect(shares(el)).toEqual([
+      'Savings €400.00 Rainy day',
+      'Allowance €200.00 Revolut',
+      'Debt Repayment €400.00 Car loan',
+    ]);
+    expect(card(el)).not.toContain('Shortfall');
+  });
+
+  it('warn about a Shortfall without reducing Savings or Allowance', async () => {
+    api.months['2026-11'] = [entry(1, 'INCOME', 'Salary', 2500), entry(2, 'EXPENSE', 'Rent', 2000)];
+    api.allocations['2026-11'] = split({ debtRepayment: 0, shortfall: true });
+    const { el } = await render(api);
+
+    expect(card(el)).toContain('Shortfall: Savings and Allowance are €100.00 more');
+    expect(shares(el)).toEqual([
+      'Savings €400.00 Rainy day',
+      'Allowance €200.00 Revolut',
+      'Debt Repayment €0.00 Car loan',
+    ]);
+  });
+
+  it('say when the debt was paid off and prompt for a new one', async () => {
+    api.allocations['2026-11'] = split({ debtOverflow: 100, debtPaidOffIn: '2026-11' });
+    const page = await render(api);
+
+    expect(card(page.el)).toContain('Car loan was paid off in November 2026.');
+    expect(card(page.el)).toContain('Debt Repayment now goes to Rainy day.');
+    page.el.querySelector<HTMLButtonElement>('section.allocation .paid-off button')!.click();
+    await page.fixture.whenStable();
+    expect(page.el.querySelector('dialog app-allocation-form')).not.toBeNull();
+  });
+
+  it('save from the month being viewed, offering only the right kind of Pot for each share', async () => {
+    const page = await render(api);
+    page.el.querySelector<HTMLButtonElement>('.allocate-button')!.click();
+    await page.fixture.whenStable();
+
+    const options = (id: string) =>
+      Array.from(page.el.querySelector<HTMLSelectElement>(`dialog #${id}`)!.options, (option) =>
+        option.textContent!.trim(),
+      );
+    expect(options('allocation-savings-pot')).toEqual(['Not assigned', 'Rainy day']);
+    expect(options('allocation-debt-pot')).toEqual(['Not assigned', 'Car loan']);
+
+    for (const [id, value] of Object.entries({
+      'allocation-savings': '400',
+      'allocation-allowance': '200',
+    })) {
+      const input = page.el.querySelector<HTMLInputElement>(`dialog #${id}`)!;
+      input.value = value;
+      input.dispatchEvent(new Event('input'));
+    }
+    const debtPot = page.el.querySelector<HTMLSelectElement>('dialog #allocation-debt-pot')!;
+    debtPot.value = debtPot.options[1].value;
+    debtPot.dispatchEvent(new Event('change'));
+    page.el.querySelector('dialog form')!.dispatchEvent(new Event('submit'));
+    await page.fixture.whenStable();
+
+    expect(api.savedAllocations).toEqual([
+      {
+        month: '2026-11',
+        request: {
+          savings: 400,
+          allowance: 200,
+          allowanceAccount: 'AIB',
+          savingsPotId: null,
+          debtPotId: 1,
+        },
+      },
+    ]);
   });
 });

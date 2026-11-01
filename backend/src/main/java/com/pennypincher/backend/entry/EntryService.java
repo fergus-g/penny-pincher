@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.pennypincher.backend.pot.PotMonth;
 import com.pennypincher.backend.pot.PotService;
 
 @Service
@@ -75,9 +76,10 @@ public class EntryService {
 		List<Entry> entries = this.entryRepository.findActiveIn(month);
 		BigDecimal totalIncome = total(entries, EntryType.INCOME);
 		BigDecimal totalExpenses = total(entries, EntryType.EXPENSE);
+		PotMonth pots = this.potService.monthOf(month);
 		return new MonthSummaryResponse(month, entries.stream().map(EntryResponse::from).toList(), totalIncome,
-				totalExpenses, totalIncome.subtract(totalExpenses), transfers(entries), expensesByCategory(entries),
-				this.potService.balancesIn(month));
+				totalExpenses, totalIncome.subtract(totalExpenses), transfers(entries, pots.allocationMoves()),
+				expensesByCategory(entries), pots.pots(), pots.allocation());
 	}
 
 	/** Every category used on this type of Entry, variants merged, in alphabetical order. */
@@ -123,12 +125,15 @@ public class EntryService {
 			.getKey();
 	}
 
-	/** One Transfer per non-home Account: its Expenses minus its Income. Zero when it balances. */
-	private static List<Transfer> transfers(List<Entry> entries) {
+	/**
+	 * One Transfer per non-home Account: its Expenses minus its Income, plus whatever the
+	 * Allocation sends there (Savings, Allowance, Debt Repayment). Zero when it balances.
+	 */
+	private static List<Transfer> transfers(List<Entry> entries, Map<Account, BigDecimal> allocationMoves) {
 		return Arrays.stream(Account.values()).filter((account) -> account != Account.HOME).map((account) -> {
 			List<Entry> onAccount = entries.stream().filter((entry) -> entry.getAccount() == account).toList();
-			return new Transfer(account,
-					total(onAccount, EntryType.EXPENSE).subtract(total(onAccount, EntryType.INCOME)));
+			return new Transfer(account, total(onAccount, EntryType.EXPENSE).subtract(total(onAccount, EntryType.INCOME))
+				.add(allocationMoves.getOrDefault(account, BigDecimal.ZERO)));
 		}).toList();
 	}
 

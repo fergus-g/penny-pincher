@@ -50,7 +50,12 @@
     <section class="card totals" aria-label="Month totals">
       <div class="totals-top">
         <div class="headline">
-          <span class="caption">Left over this month</span>
+          <span class="caption"
+            >Left over this month
+            <button type="button" class="add-button allocate-button" (click)="openAllocation()">
+              Allocate
+            </button></span
+          >
           <span class="remainder" [class.negative]="month.remainder < 0">{{
             month.remainder | currency: 'EUR'
           }}</span>
@@ -112,6 +117,64 @@
         </ul>
       </section>
     }
+
+    <section class="card allocation" aria-labelledby="allocation-title">
+      <h2 id="allocation-title">Allocation</h2>
+      @if (allocation(); as split) {
+        @if (split.shortfall) {
+          <p class="warning" role="note">
+            <strong>Shortfall:</strong> Savings and Allowance are
+            {{ split.shortfallBy | currency: 'EUR' }} more than what's left over this month.
+          </p>
+        }
+        @if (split.debtPotName && split.paidOffLabel) {
+          <div class="paid-off" role="note">
+            <p>
+              <strong>{{ split.debtPotName }} was paid off in {{ split.paidOffLabel }}.</strong>
+              @if (split.savingsPotName) {
+                Debt Repayment now goes to {{ split.savingsPotName }}.
+              } @else {
+                Debt Repayment isn't going anywhere yet.
+              }
+            </p>
+            <button type="button" class="text-button" (click)="openAllocation()">
+              Choose a new debt
+            </button>
+          </div>
+        }
+        <dl>
+          <div>
+            <dt>Savings</dt>
+            <dd>
+              <strong>{{ split.savings | currency: 'EUR' }}</strong>
+              <span class="target">{{ split.savingsPotName ?? 'Not assigned to a pot' }}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Allowance</dt>
+            <dd>
+              <strong>{{ split.allowance | currency: 'EUR' }}</strong>
+              <span class="target">{{ split.allowanceAccountLabel }}</span>
+            </dd>
+          </div>
+          <div>
+            <dt>Debt Repayment</dt>
+            <dd>
+              <strong>{{ split.debtRepayment | currency: 'EUR' }}</strong>
+              <span class="target">{{ split.debtPotName ?? 'Not assigned to a pot' }}</span>
+            </dd>
+          </div>
+        </dl>
+      } @else {
+        <div class="setup">
+          <p>
+            Set up your Allocation to split what's left over into Savings, Allowance and Debt
+            Repayment.
+          </p>
+          <button type="button" class="add-button" (click)="openAllocation()">Set up</button>
+        </div>
+      }
+    </section>
 
     <div class="sections">
       @for (section of sections(); track section.type) {
@@ -282,6 +345,15 @@
         [(saving)]="saving"
         (saved)="onPotChanged()"
         (deleted)="onPotChanged()"
+        (cancelled)="potDialog.close()"
+      />
+    } @else if (editing.form === 'allocation') {
+      <app-allocation-form
+        [month]="month()"
+        [allocation]="summary.hasValue() ? summary.value().allocation : null"
+        [pots]="potList()"
+        [(saving)]="saving"
+        (saved)="onPotChanged()"
         (cancelled)="potDialog.close()"
       />
     } @else {

@@ -37,12 +37,11 @@ class PotRepositoryTest {
 	private EntryRepository entryRepository;
 
 	@Test
-	void contributionsAreFoundByPot() {
+	void aPotWithAContributionIsKnownToHaveOne() {
 		Long potId = savePot();
 		Entry repayment = new Entry(EntryType.EXPENSE, "Loans", null, BigDecimal.TEN, Account.AIB, MAR, null);
 		repayment.setPotId(potId);
 		this.entryRepository.save(repayment);
-		assertThat(this.entryRepository.findByPotId(potId)).extracting(Entry::getId).containsExactly(repayment.getId());
 		assertThat(this.entryRepository.existsByPotId(potId)).isTrue();
 	}
 
