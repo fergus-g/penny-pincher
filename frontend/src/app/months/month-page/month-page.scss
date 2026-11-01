@@ -230,6 +230,94 @@ main {
   }
 }
 
+/* Allocation card */
+
+.allocation {
+  padding: 20px 32px;
+
+  h2 {
+    margin: 0 0 12px;
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+    margin: 0;
+
+    dt {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    dd {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin: 4px 0 0;
+    }
+
+    strong {
+      font-size: 18px;
+      font-weight: 600;
+    }
+  }
+
+  .target {
+    color: var(--muted);
+    font-size: 13px;
+  }
+}
+
+.warning,
+.paid-off {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.warning {
+  background: #fef3f2;
+  color: #912018;
+}
+
+.paid-off {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #e6f4ea;
+  color: #1e6b34;
+
+  p {
+    margin: 0;
+  }
+}
+
+.setup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+  }
+}
+
+.allocate-button {
+  margin-left: 12px;
+}
+
 /* Income and Expenses cards */
 
 .sections {

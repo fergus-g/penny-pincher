@@ -3,6 +3,7 @@ import { inject, Service } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import {
+  AllocationRequest,
   CreateEntryRequest,
   CreatePotRequest,
   Entry,
@@ -63,6 +64,12 @@ export class MonthApi {
   deletePot(id: number): Observable<void> {
     console.log('[MonthApi] deletePot', id);
     return this.http.delete<void>(`/api/pots/${id}`);
+  }
+
+  /** Sets the Allocation from `month` onwards; earlier months keep theirs. */
+  saveAllocation(month: string, request: AllocationRequest): Observable<unknown> {
+    console.log('[MonthApi] saveAllocation', month, request);
+    return this.http.put(`/api/months/${month}/allocation`, request);
   }
 
   /** Records the Pot's actual balance at the end of `month`. */

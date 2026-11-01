@@ -13,6 +13,7 @@ import {
 import { rxResource } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 
+import { AllocationForm } from '../allocation-form/allocation-form';
 import { CheckInForm } from '../check-in-form/check-in-form';
 import { EntryForm } from '../entry-form/entry-form';
 import { ExpenseChart } from '../expense-chart/expense-chart';
@@ -64,7 +65,7 @@ const SECTION = {
 const RECENT_CATEGORIES = 6;
 
 @Component({
-  imports: [CheckInForm, CurrencyPipe, EntryForm, ExpenseChart, PotForm],
+  imports: [AllocationForm, CheckInForm, CurrencyPipe, EntryForm, ExpenseChart, PotForm],
   selector: 'app-month-page',
   styleUrl: './month-page.scss',
   templateUrl: './month-page.html',
@@ -166,10 +167,30 @@ export class MonthPage {
     })),
   );
 
+  /** This month's Allocation, worded for display; null before the first Allocation starts. */
+  protected readonly allocation = computed(() => {
+    const month = this.summary.hasValue() ? this.summary.value() : null;
+    const split = month?.allocation;
+    if (!month || !split) {
+      return null;
+    }
+    return {
+      ...split,
+      allowanceAccountLabel: accountLabel(split.allowanceAccount),
+      /** How far Savings plus Allowance overshoot the Remainder. */
+      shortfallBy: split.savings + split.allowance - month.remainder,
+      paidOffLabel: split.debtPaidOffIn ? monthLabel(split.debtPaidOffIn) : null,
+    };
+  });
+
+  /** The second dialog, for the Pot, Check-in and Allocation forms. */
   private readonly potDialog = viewChild.required<ElementRef<HTMLDialogElement>>('potDialog');
-  /** What the Pot dialog is showing; null while it's closed. */
+  /** What the second dialog is showing; null while it's closed. */
   protected readonly potEditing = signal<
-    { form: 'pot'; pot: Pot | null } | { form: 'check-in'; pot: PotBalance } | null
+    | { form: 'pot'; pot: Pot | null }
+    | { form: 'check-in'; pot: PotBalance }
+    | { form: 'allocation' }
+    | null
   >(null);
 
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
@@ -286,7 +307,16 @@ export class MonthPage {
     this.potDialog().nativeElement.showModal();
   }
 
-  /** A Pot or Check-in was saved or deleted: balances and the Pot list may both have changed. */
+  protected openAllocation(): void {
+    console.log('[MonthPage] allocate clicked');
+    this.potEditing.set({ form: 'allocation' });
+    this.potDialog().nativeElement.showModal();
+  }
+
+  /**
+   * A Pot, Check-in or Allocation was saved or deleted: balances, Transfers and the Pot list may
+   * all have changed.
+   */
   protected onPotChanged(): void {
     console.log('[MonthPage] pot changed');
     this.potDialog().nativeElement.close();

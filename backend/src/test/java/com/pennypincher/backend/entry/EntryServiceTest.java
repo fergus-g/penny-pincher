@@ -3,13 +3,16 @@ package com.pennypincher.backend.entry;
 import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.pennypincher.backend.pot.PotMonth;
 import com.pennypincher.backend.pot.PotService;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,6 +36,12 @@ class EntryServiceTest {
 	private final PotService potService = mock(PotService.class);
 
 	private final EntryService entryService = new EntryService(this.entryRepository, this.potService);
+
+	/** No Pots and no Allocation unless a test says otherwise. */
+	@BeforeEach
+	void noPots() {
+		given(this.potService.monthOf(any(YearMonth.class))).willReturn(new PotMonth(List.of(), null, Map.of()));
+	}
 
 	@Test
 	void createOneOffEndsInItsStartMonth() {
@@ -134,6 +143,16 @@ class EntryServiceTest {
 			assertThat(transfer.account()).isEqualTo(Account.REVOLUT);
 			assertThat(transfer.amount()).isZero();
 		});
+	}
+
+	@Test
+	void transferAddsWhatTheAllocationSendsToRevolut() {
+		given(this.entryRepository.findActiveIn(OCT))
+			.willReturn(List.of(entry(EntryType.INCOME, "2500.00"), entry(EntryType.EXPENSE, "100.00", Account.REVOLUT)));
+		given(this.potService.monthOf(OCT)).willReturn(new PotMonth(List.of(), null,
+				Map.of(Account.REVOLUT, new BigDecimal("600.00"), Account.AIB, new BigDecimal("400.00"))));
+		assertThat(this.entryService.getMonth(OCT).transfers()).singleElement()
+			.satisfies((transfer) -> assertThat(transfer.amount()).isEqualByComparingTo("700.00"));
 	}
 
 	@Test

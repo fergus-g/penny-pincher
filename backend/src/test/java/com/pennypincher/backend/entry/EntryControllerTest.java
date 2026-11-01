@@ -74,7 +74,7 @@ class EntryControllerTest {
 		given(this.entryService.getMonth(OCT)).willReturn(new MonthSummaryResponse(OCT, List.of(laptop()),
 				BigDecimal.ZERO, new BigDecimal("300.50"), new BigDecimal("-300.50"),
 				List.of(new Transfer(Account.REVOLUT, new BigDecimal("300.50"))),
-				List.of(new CategoryTotal("Tech", new BigDecimal("300.50"))), List.of()));
+				List.of(new CategoryTotal("Tech", new BigDecimal("300.50"))), List.of(), null));
 		assertThat(this.mvc.get().uri("/api/months/2026-10")).hasStatusOk().bodyJson().isLenientlyEqualTo("""
 				{"month":"2026-10","entries":[{"id":1}],"totalExpenses":300.50,"remainder":-300.50,"transfers":[{"account":"REVOLUT","amount":300.50}],
 				"expensesByCategory":[{"category":"Tech","amount":300.50}]}
