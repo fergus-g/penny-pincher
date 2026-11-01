@@ -372,7 +372,16 @@ main {
 }
 
 .entries {
+  /* Every row is this tall, so exactly MAX_ROWS (5) fit before the list scrolls. */
+  --entry-row: 64px;
+
   overflow: hidden;
+}
+
+.rows.scroll {
+  max-height: calc(5 * var(--entry-row));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .section-header {
@@ -454,8 +463,8 @@ main {
   align-items: center;
   gap: 16px;
   width: 100%;
-  min-height: 60px;
-  padding: 14px 24px;
+  height: var(--entry-row);
+  padding: 0 24px;
   border: none;
   border-bottom: 1px solid #f0f2f5;
   background: transparent;
@@ -478,15 +487,20 @@ main {
   min-width: 0;
 }
 
+/* Rows are a fixed height, so long text is cut short rather than wrapped. */
 .entry-name {
+  overflow: hidden;
   font-size: 15px;
   font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .entry-meta {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
   gap: 8px;
   color: var(--muted);
   font-size: 13px;
@@ -702,6 +716,6 @@ dialog {
   }
 
   .entry {
-    padding: 10px 16px;
+    padding: 0 16px;
   }
 }

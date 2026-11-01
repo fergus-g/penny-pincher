@@ -372,6 +372,55 @@ describe('MonthPage sections', () => {
     });
   });
 
+  it('scroll past 5 rows inside the card, for Income and Expenses alike', async () => {
+    api.months['2026-11'] = [
+      ...Array.from({ length: 6 }, (_, i) => entry(10 + i, 'EXPENSE', `Bill ${i}`, 10)),
+      ...Array.from({ length: 5 }, (_, i) => entry(20 + i, 'INCOME', `Pay ${i}`, 100)),
+    ];
+    const page = await render(api);
+    page.toggle('Expenses')!.click();
+    page.toggle('Income')!.click();
+    await page.fixture.whenStable();
+
+    const list = (title: string) => page.section(title).querySelector('.rows')!;
+    expect(page.rows('Expenses')).toHaveLength(6);
+    expect(list('Expenses').classList).toContain('scroll');
+    expect(page.section('Expenses').textContent).toContain('6 entries');
+    expect(list('Income').classList).not.toContain('scroll');
+
+    // A sixth Income in December makes that list scroll too.
+    api.months['2026-12'] = Array.from({ length: 6 }, (_, i) =>
+      entry(40 + i, 'INCOME', `Pay ${i}`, 100),
+    );
+    page.fixture.componentRef.setInput('month', '2026-12');
+    await page.fixture.whenStable();
+    expect(list('Income').classList).toContain('scroll');
+  });
+
+  it('scroll a just-added Entry into view when it is below the fold of a scrolling list', async () => {
+    api.months['2026-11'] = Array.from({ length: 6 }, (_, i) =>
+      entry(10 + i, 'EXPENSE', `Bill ${i}`, 10),
+    );
+    const page = await render(api);
+    page.toggle('Expenses')!.click();
+    await page.fixture.whenStable();
+
+    // On screen, but below the bottom of the list's scroll area.
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: Element,
+    ) {
+      return (
+        this.classList.contains('rows') ? { top: 100, bottom: 420 } : { top: 500, bottom: 564 }
+      ) as DOMRect;
+    });
+    await addEntry(page, 'Expenses', { category: 'Food', name: 'Takeaway', amount: '25' });
+
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
+      behavior: 'smooth',
+      block: 'nearest',
+    });
+  });
+
   it('do not replay the flash after collapsing mid-flash', async () => {
     const page = await render(api);
     await addEntry(page, 'Expenses', {
