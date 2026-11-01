@@ -53,6 +53,13 @@ export interface MonthSummary {
   remainder: number;
   /** One per non-home Account: what to move into it this month. Negative means move it back home. */
   transfers: Transfer[];
+  /** The month's Expenses totalled per category, largest first. Variants like "groceries " are merged. */
+  expensesByCategory: CategoryTotal[];
+}
+
+export interface CategoryTotal {
+  category: string;
+  amount: number;
 }
 
 export interface Transfer {

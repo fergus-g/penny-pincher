@@ -210,6 +210,13 @@
         </section>
       }
     </div>
+
+    <!-- Chart.js is loaded only once the chart scrolls into view, keeping it out of the first load. -->
+    @defer (on viewport) {
+      <app-expense-chart [categories]="month.expensesByCategory" />
+    } @placeholder {
+      <div class="chart-placeholder"></div>
+    }
   } @else {
     <p class="message">Loading…</p>
   }
