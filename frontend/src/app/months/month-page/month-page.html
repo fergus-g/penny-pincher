@@ -83,6 +83,36 @@
       }
     </section>
 
+    @if (transfers().length > 0) {
+      <section class="card transfers" aria-labelledby="transfers-title">
+        <h2 id="transfers-title">Transfers</h2>
+        <ul>
+          @for (transfer of transfers(); track transfer.account) {
+            <li>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M5 12h14M13 6l6 6-6 6" />
+              </svg>
+              <span
+                >{{ transfer.text.verb }}
+                <strong>{{ transfer.amount | currency: 'EUR' }}</strong>
+                {{ transfer.text.to }}</span
+              >
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
     <div class="sections">
       @for (section of sections(); track section.type) {
         <section
@@ -153,7 +183,7 @@
                       ><span class="visually-hidden">Edit </span>{{ entryLabel(entry) }}</span
                     >
                     <span class="entry-meta">
-                      {{ entry.category }}
+                      {{ entry.category }} · {{ accountLabel(entry.account) }}
                       <span class="badge" [class]="badge.tone">{{ badge.label }}</span>
                     </span>
                   </span>

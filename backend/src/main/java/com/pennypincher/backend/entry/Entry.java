@@ -36,6 +36,10 @@ public class Entry {
 	@Column(nullable = false, precision = 12, scale = 2)
 	private BigDecimal amount;
 
+	@Enumerated(EnumType.STRING)
+	@Column(nullable = false, length = 20)
+	private Account account;
+
 	@Convert(converter = YearMonthConverter.class)
 	@Column(name = "start_month", nullable = false)
 	private YearMonth startMonth;
@@ -51,12 +55,13 @@ public class Entry {
 	protected Entry() {
 	}
 
-	public Entry(EntryType type, String category, String name, BigDecimal amount, YearMonth startMonth,
-			YearMonth endMonth) {
+	public Entry(EntryType type, String category, String name, BigDecimal amount, Account account,
+			YearMonth startMonth, YearMonth endMonth) {
 		this.type = type;
 		this.category = category;
 		this.name = name;
 		this.amount = amount;
+		this.account = account;
 		this.startMonth = startMonth;
 		this.endMonth = endMonth;
 	}
@@ -91,6 +96,14 @@ public class Entry {
 
 	public void setAmount(BigDecimal amount) {
 		this.amount = amount;
+	}
+
+	public Account getAccount() {
+		return this.account;
+	}
+
+	public void setAccount(Account account) {
+		this.account = account;
 	}
 
 	public YearMonth getStartMonth() {

@@ -10,13 +10,15 @@ public record EntryResponse(
 		String category,
 		String name,
 		BigDecimal amount,
+		Account account,
 		YearMonth startMonth,
 		YearMonth endMonth,
 		Instant createdAt) {
 
 	static EntryResponse from(Entry entry) {
 		return new EntryResponse(entry.getId(), entry.getType(), entry.getCategory(), entry.getName(),
-				entry.getAmount(), entry.getStartMonth(), entry.getEndMonth(), entry.getCreatedAt());
+				entry.getAmount(), entry.getAccount(), entry.getStartMonth(), entry.getEndMonth(),
+				entry.getCreatedAt());
 	}
 
 }

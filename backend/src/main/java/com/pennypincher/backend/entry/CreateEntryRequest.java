@@ -18,6 +18,7 @@ public record CreateEntryRequest(
 		@NotBlank @Size(max = 50) String category,
 		@Size(max = 100) String name,
 		@NotNull @Positive @Digits(integer = 10, fraction = 2) BigDecimal amount,
+		@NotNull Account account,
 		@NotNull YearMonth startMonth,
 		boolean oneOff) {
 }

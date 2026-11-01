@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.List;
 
+import jakarta.persistence.EntityManager;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +16,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Runs {@link EntryRepository#findActiveIn} against the real MySQL database. Each test
+ * Runs {@link EntryRepository#findActiveIn} and the migrations against the real MySQL database. Each test
  * rolls back, and assertions only look at the entries saved here, so existing rows in
  * the database don't affect the results.
  */
@@ -32,6 +34,9 @@ class EntryRepositoryTest {
 
 	@Autowired
 	private EntryRepository entryRepository;
+
+	@Autowired
+	private EntityManager entityManager;
 
 	private Long oneOff;
 
@@ -70,8 +75,20 @@ class EntryRepositoryTest {
 		assertThat(july).doesNotContain(this.oneOff, this.cancelled);
 	}
 
+	/** Rows from before accounts existed have no account column value; V2 defaults them to AIB. */
+	@Test
+	void rowWithoutAnAccountIsOnAib() {
+		this.entityManager
+			.createNativeQuery("insert into entries (type, category, amount, start_month)"
+					+ " values ('EXPENSE', 'Test', 10.00, '2026-03-01')")
+			.executeUpdate();
+		List<Entry> march = this.entryRepository.findActiveIn(MAR);
+		assertThat(march.get(march.size() - 1).getAccount()).isEqualTo(Account.AIB);
+	}
+
 	private Long save(String name, YearMonth startMonth, YearMonth endMonth) {
-		Entry entry = new Entry(EntryType.EXPENSE, "Test", name, new BigDecimal("10.00"), startMonth, endMonth);
+		Entry entry = new Entry(EntryType.EXPENSE, "Test", name, new BigDecimal("10.00"), Account.AIB, startMonth,
+				endMonth);
 		return this.entryRepository.save(entry).getId();
 	}
 

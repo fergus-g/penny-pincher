@@ -9,5 +9,6 @@ public record MonthSummaryResponse(
 		List<EntryResponse> entries,
 		BigDecimal totalIncome,
 		BigDecimal totalExpenses,
-		BigDecimal remainder) {
+		BigDecimal remainder,
+		List<Transfer> transfers) {
 }

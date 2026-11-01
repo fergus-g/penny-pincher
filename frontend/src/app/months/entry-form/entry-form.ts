@@ -4,7 +4,14 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 
 import { MonthApi } from '../month-api';
 import { monthLabel } from '../month-label';
-import { Entry, EntryType, UpdateEntryRequest } from '../month.model';
+import {
+  Account,
+  ACCOUNTS,
+  Entry,
+  EntryType,
+  HOME_ACCOUNT,
+  UpdateEntryRequest,
+} from '../month.model';
 
 /** Turns a backend ProblemDetail (with per-field `errors`) into one line of text. */
 function errorMessage(error: HttpErrorResponse, fallback: string): string {
@@ -74,8 +81,10 @@ export class EntryForm implements OnInit {
       // At most 2 decimal places, matching the backend's @Digits(fraction = 2).
       Validators.pattern(/^-?\d+(\.\d{1,2})?$/),
     ]),
+    account: new FormControl<Account>(HOME_ACCOUNT, { nonNullable: true }),
     oneOff: new FormControl(false, { nonNullable: true }),
   });
+  protected readonly accounts = ACCOUNTS;
 
   ngOnInit(): void {
     const entry = this.entry();
@@ -84,6 +93,7 @@ export class EntryForm implements OnInit {
         category: entry.category,
         name: entry.name ?? '',
         amount: entry.amount,
+        account: entry.account,
         oneOff: entry.endMonth === entry.startMonth,
       });
     }
@@ -99,11 +109,12 @@ export class EntryForm implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
-    const { category, name, amount, oneOff } = this.form.getRawValue();
+    const { category, name, amount, account, oneOff } = this.form.getRawValue();
     const body: UpdateEntryRequest = {
       category: category.trim(),
       name: name.trim() || null,
       amount: amount!,
+      account,
       oneOff,
     };
     const entry = this.entry();

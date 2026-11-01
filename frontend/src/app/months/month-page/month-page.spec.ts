@@ -7,13 +7,20 @@ import { MonthApi } from '../month-api';
 import { CreateEntryRequest, Entry, MonthSummary } from '../month.model';
 import { MonthPage } from './month-page';
 
-function entry(id: number, type: Entry['type'], name: string, amount: number): Entry {
+function entry(
+  id: number,
+  type: Entry['type'],
+  name: string,
+  amount: number,
+  account: Entry['account'] = 'AIB',
+): Entry {
   return {
     id,
     type,
     category: type === 'INCOME' ? 'Salary' : 'Housing',
     name,
     amount,
+    account,
     startMonth: '2026-11',
     endMonth: null,
     createdAt: '2026-11-01T00:00:00Z',
@@ -21,14 +28,18 @@ function entry(id: number, type: Entry['type'], name: string, amount: number): E
 }
 
 function summary(month: string, entries: Entry[]): MonthSummary {
-  const total = (type: Entry['type']) =>
-    entries.filter((e) => e.type === type).reduce((sum, e) => sum + e.amount, 0);
+  const total = (type: Entry['type'], on = entries) =>
+    on.filter((e) => e.type === type).reduce((sum, e) => sum + e.amount, 0);
+  const revolut = entries.filter((e) => e.account === 'REVOLUT');
   return {
     month,
     entries,
     totalIncome: total('INCOME'),
     totalExpenses: total('EXPENSE'),
     remainder: total('INCOME') - total('EXPENSE'),
+    transfers: [
+      { account: 'REVOLUT', amount: total('EXPENSE', revolut) - total('INCOME', revolut) },
+    ],
   };
 }
 
@@ -43,7 +54,13 @@ class FakeMonthApi {
 
   createEntry(request: CreateEntryRequest): Observable<Entry> {
     const created: Entry = {
-      ...entry(this.nextId++, request.type, request.name ?? request.category, request.amount),
+      ...entry(
+        this.nextId++,
+        request.type,
+        request.name ?? request.category,
+        request.amount,
+        request.account,
+      ),
       category: request.category,
     };
     this.months[request.startMonth] = [...(this.months[request.startMonth] ?? []), created];
@@ -82,7 +99,7 @@ async function render(api: FakeMonthApi, month = '2026-11') {
 async function addEntry(
   page: Awaited<ReturnType<typeof render>>,
   title: string,
-  values: { category: string; name: string; amount: string },
+  values: { category: string; name: string; amount: string; account?: string },
 ) {
   page.section(title).querySelector<HTMLButtonElement>('.add-button')!.click();
   await page.fixture.whenStable();
@@ -90,7 +107,7 @@ async function addEntry(
   for (const [field, value] of Object.entries(values)) {
     const input = form.querySelector<HTMLInputElement>(`[formControlName="${field}"]`)!;
     input.value = value;
-    input.dispatchEvent(new Event('input'));
+    input.dispatchEvent(new Event(input.tagName === 'SELECT' ? 'change' : 'input'));
   }
   form.dispatchEvent(new Event('submit'));
   await page.fixture.whenStable();
@@ -259,5 +276,73 @@ describe('MonthPage sections', () => {
     expect(page.rows('Expenses').map((row) => row.textContent)).toEqual([
       expect.stringContaining('Groceries'),
     ]);
+  });
+});
+
+describe('MonthPage transfers', () => {
+  let api: FakeMonthApi;
+
+  beforeEach(() => {
+    vi.stubGlobal('IntersectionObserver', VisibleIntersectionObserver);
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+      this.open = false;
+    };
+    api = new FakeMonthApi();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const transfers = (el: HTMLElement) => el.querySelector('section.transfers');
+  const transferLines = (el: HTMLElement) =>
+    Array.from(el.querySelectorAll('section.transfers li'), (li) =>
+      li.textContent!.replace(/\s+/g, ' ').trim(),
+    );
+
+  it('ask for a Transfer to cover Revolut Expenses', async () => {
+    api.months['2026-11'] = [
+      entry(1, 'INCOME', 'Salary', 3200),
+      entry(2, 'EXPENSE', 'Netflix', 120, 'REVOLUT'),
+      entry(3, 'EXPENSE', 'Gym', 180, 'REVOLUT'),
+    ];
+    const { el } = await render(api);
+
+    expect(transferLines(el)).toEqual(['Transfer €300.00 to Revolut']);
+  });
+
+  it('ask to move money back to AIB when Revolut Income exceeds its Expenses', async () => {
+    api.months['2026-11'] = [
+      entry(1, 'INCOME', 'Refund', 500, 'REVOLUT'),
+      entry(2, 'EXPENSE', 'Netflix', 120, 'REVOLUT'),
+    ];
+    const { el } = await render(api);
+
+    expect(transferLines(el)).toEqual(['Move €380.00 back to AIB']);
+  });
+
+  it('are hidden with no Revolut activity', async () => {
+    api.months['2026-11'] = [entry(1, 'INCOME', 'Salary', 3200), entry(2, 'EXPENSE', 'Rent', 1250)];
+    const { el } = await render(api);
+
+    expect(transfers(el)).toBeNull();
+  });
+
+  it('pick up a new Entry added on Revolut, which shows its Account', async () => {
+    const page = await render(api);
+
+    await addEntry(page, 'Expenses', {
+      category: 'Subscriptions',
+      name: 'Spotify',
+      amount: '12',
+      account: 'REVOLUT',
+    });
+
+    expect(api.months['2026-11'][0].account).toBe('REVOLUT');
+    expect(page.rows('Expenses')[0].textContent).toContain('Subscriptions · Revolut');
+    expect(transferLines(page.el)).toEqual(['Transfer €12.00 to Revolut']);
   });
 });

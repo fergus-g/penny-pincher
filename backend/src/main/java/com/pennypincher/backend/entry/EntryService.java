@@ -2,6 +2,7 @@ package com.pennypincher.backend.entry;
 
 import java.math.BigDecimal;
 import java.time.YearMonth;
+import java.util.Arrays;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -22,7 +23,7 @@ public class EntryService {
 	public EntryResponse create(CreateEntryRequest request) {
 		YearMonth endMonth = request.oneOff() ? request.startMonth() : null;
 		Entry entry = new Entry(request.type(), request.category(), request.name(), request.amount(),
-				request.startMonth(), endMonth);
+				request.account(), request.startMonth(), endMonth);
 		return EntryResponse.from(this.entryRepository.save(entry));
 	}
 
@@ -32,6 +33,7 @@ public class EntryService {
 		entry.setCategory(request.category());
 		entry.setName(request.name());
 		entry.setAmount(request.amount());
+		entry.setAccount(request.account());
 		entry.setEndMonth(request.oneOff() ? entry.getStartMonth() : null);
 		return EntryResponse.from(entry);
 	}
@@ -47,7 +49,16 @@ public class EntryService {
 		BigDecimal totalIncome = total(entries, EntryType.INCOME);
 		BigDecimal totalExpenses = total(entries, EntryType.EXPENSE);
 		return new MonthSummaryResponse(month, entries.stream().map(EntryResponse::from).toList(), totalIncome,
-				totalExpenses, totalIncome.subtract(totalExpenses));
+				totalExpenses, totalIncome.subtract(totalExpenses), transfers(entries));
+	}
+
+	/** One Transfer per non-home Account: its Expenses minus its Income. Zero when it balances. */
+	private static List<Transfer> transfers(List<Entry> entries) {
+		return Arrays.stream(Account.values()).filter((account) -> account != Account.HOME).map((account) -> {
+			List<Entry> onAccount = entries.stream().filter((entry) -> entry.getAccount() == account).toList();
+			return new Transfer(account,
+					total(onAccount, EntryType.EXPENSE).subtract(total(onAccount, EntryType.INCOME)));
+		}).toList();
 	}
 
 	private Entry findEntry(Long id) {
