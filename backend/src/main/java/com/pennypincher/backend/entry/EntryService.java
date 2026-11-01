@@ -35,11 +35,14 @@ public class EntryService {
 	@Transactional
 	public EntryResponse create(CreateEntryRequest request) {
 		requireValidAccount(request.type(), request.account());
+		requireOneAmount(request.amount(), request.weeklyRate());
+		requireExpenseOnly(request.type(), request.weeklyRate(), "a Weekly Rate");
 		requireExpenseOnly(request.type(), request.dueDay(), "a Due Day");
 		requireValidPot(request.type(), request.potId());
 		YearMonth endMonth = request.oneOff() ? request.startMonth() : null;
 		Entry entry = new Entry(request.type(), request.category(), request.name(), request.amount(),
 				request.account(), request.startMonth(), endMonth);
+		entry.setWeeklyRate(request.weeklyRate());
 		entry.setPotId(request.potId());
 		entry.setDueDay(request.dueDay());
 		Entry saved = this.entryRepository.save(entry);
@@ -50,11 +53,14 @@ public class EntryService {
 	public EntryResponse update(Long id, UpdateEntryRequest request) {
 		Entry entry = findEntry(id);
 		requireValidAccount(entry.getType(), request.account());
+		requireOneAmount(request.amount(), request.weeklyRate());
+		requireExpenseOnly(entry.getType(), request.weeklyRate(), "a Weekly Rate");
 		requireExpenseOnly(entry.getType(), request.dueDay(), "a Due Day");
 		requireValidPot(entry.getType(), request.potId());
 		entry.setCategory(request.category());
 		entry.setName(request.name());
 		entry.setAmount(request.amount());
+		entry.setWeeklyRate(request.weeklyRate());
 		entry.setAccount(request.account());
 		entry.setEndMonth(request.oneOff() ? entry.getStartMonth() : null);
 		entry.setPotId(request.potId());
@@ -69,6 +75,13 @@ public class EntryService {
 		}
 		if (type == EntryType.INCOME && account != null) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Income has no Account");
+		}
+	}
+
+	/** An Entry is priced one way: a monthly amount or a Weekly Rate. */
+	private static void requireOneAmount(BigDecimal amount, BigDecimal weeklyRate) {
+		if ((amount == null) == (weeklyRate == null)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Give either an amount or a weekly rate");
 		}
 	}
 
@@ -97,12 +110,13 @@ public class EntryService {
 	@Transactional(readOnly = true)
 	public MonthSummaryResponse getMonth(YearMonth month) {
 		List<Entry> entries = this.entryRepository.findActiveIn(month);
-		BigDecimal totalIncome = total(entries, EntryType.INCOME);
-		BigDecimal totalExpenses = total(entries, EntryType.EXPENSE);
+		BigDecimal totalIncome = total(entries, EntryType.INCOME, month);
+		BigDecimal totalExpenses = total(entries, EntryType.EXPENSE, month);
 		PotMonth pots = this.potService.monthOf(month);
-		return new MonthSummaryResponse(month, entries.stream().map((entry) -> EntryResponse.from(entry, month)).toList(), totalIncome,
-				totalExpenses, totalIncome.subtract(totalExpenses), transfers(entries),
-				expensesByCategory(entries), pots.pots(), pots.allocation());
+		return new MonthSummaryResponse(month,
+				entries.stream().map((entry) -> EntryResponse.from(entry, month)).toList(), totalIncome,
+				totalExpenses, totalIncome.subtract(totalExpenses), transfers(entries, month),
+				expensesByCategory(entries, month), pots.pots(), pots.allocation());
 	}
 
 	/** Every category used on this type of Entry, variants merged, in alphabetical order. */
@@ -118,7 +132,7 @@ public class EntryService {
 	}
 
 	/** The month's Expenses totalled per category, largest first. */
-	private static List<CategoryTotal> expensesByCategory(List<Entry> entries) {
+	private static List<CategoryTotal> expensesByCategory(List<Entry> entries, YearMonth month) {
 		return entries.stream()
 			.filter((entry) -> entry.getType() == EntryType.EXPENSE)
 			.collect(Collectors.groupingBy((entry) -> categoryKey(entry.getCategory()), LinkedHashMap::new,
@@ -126,7 +140,7 @@ public class EntryService {
 			.values()
 			.stream()
 			.map((group) -> new CategoryTotal(mostCommonSpelling(group.stream().map(Entry::getCategory).toList()),
-					total(group, EntryType.EXPENSE)))
+					total(group, EntryType.EXPENSE, month)))
 			.sorted(Comparator.comparing(CategoryTotal::amount).reversed())
 			.toList();
 	}
@@ -149,11 +163,11 @@ public class EntryService {
 	}
 
 	/** One Transfer per Account, always: the total of the Expenses paid out of it this month. */
-	private static List<Transfer> transfers(List<Entry> entries) {
+	private static List<Transfer> transfers(List<Entry> entries, YearMonth month) {
 		return Arrays.stream(Account.values())
 			.map((account) -> new Transfer(account,
 					total(entries.stream().filter((entry) -> entry.getAccount() == account).toList(),
-							EntryType.EXPENSE)))
+							EntryType.EXPENSE, month)))
 			.toList();
 	}
 
@@ -162,10 +176,11 @@ public class EntryService {
 			.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Entry " + id + " not found"));
 	}
 
-	private static BigDecimal total(List<Entry> entries, EntryType type) {
+	/** The month's total of one type of Entry, with Weekly Rates priced for that month. */
+	private static BigDecimal total(List<Entry> entries, EntryType type, YearMonth month) {
 		return entries.stream()
 			.filter((entry) -> entry.getType() == type)
-			.map(Entry::getAmount)
+			.map((entry) -> entry.amountIn(month))
 			.reduce(BigDecimal.ZERO, BigDecimal::add);
 	}
 

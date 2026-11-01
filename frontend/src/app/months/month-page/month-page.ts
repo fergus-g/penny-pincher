@@ -61,6 +61,8 @@ const SECTION = {
   { title: string; noun: string; empty: string; total: keyof MonthSummary }
 >;
 
+const euros = new Intl.NumberFormat('en', { style: 'currency', currency: 'EUR' });
+
 /** How many recent categories the add dialog offers as quick picks. */
 const RECENT_CATEGORIES = 6;
 
@@ -358,8 +360,8 @@ export class MonthPage {
   }
 
   /**
-   * Category, the Account unless it's the default one, the Due Day, then the Pot a Contribution
-   * pays into: "Loans · Revolut · Due 1st → Car loan".
+   * Category, the Account unless it's the default one, the Due Day, a Weekly Rate's sum, then the
+   * Pot a Contribution pays into: "Food · Revolut · Due 1st · €180.00/week × 5 → Car loan".
    */
   protected entryMeta(entry: Entry): string {
     const pot = this.potList().find((candidate) => candidate.id === entry.potId);
@@ -368,6 +370,9 @@ export class MonthPage {
         entry.category,
         entry.account && entry.account !== DEFAULT_ACCOUNT ? accountLabel(entry.account) : null,
         entry.dueDayInMonth ? `Due ${ordinal(entry.dueDayInMonth)}` : null,
+        entry.weeklyRate !== null
+          ? `${euros.format(entry.weeklyRate)}/week × ${entry.weeks}`
+          : null,
       ]
         .filter((part) => part !== null)
         .join(' · ') + (pot ? ` → ${pot.name}` : '')

@@ -78,7 +78,7 @@ final class MonthLedger {
 		}
 		Allocation allocation = inForce.get();
 		List<Entry> active = entries.stream().filter((entry) -> entry.isActiveIn(month)).toList();
-		BigDecimal remainder = total(active, EntryType.INCOME).subtract(total(active, EntryType.EXPENSE));
+		BigDecimal remainder = total(active, EntryType.INCOME, month).subtract(total(active, EntryType.EXPENSE, month));
 		BigDecimal planned = allocation.getSavings().add(allocation.getAllowance());
 		BigDecimal debtRepayment = remainder.subtract(planned).max(BigDecimal.ZERO);
 		BigDecimal debtPaid = debtRepayment;
@@ -103,14 +103,14 @@ final class MonthLedger {
 	private static BigDecimal contributions(Pot pot, List<Entry> entries, YearMonth month) {
 		return entries.stream()
 			.filter((entry) -> pot.getId().equals(entry.getPotId()) && entry.isActiveIn(month))
-			.map(Entry::getAmount)
+			.map((entry) -> entry.amountIn(month))
 			.reduce(BigDecimal.ZERO, BigDecimal::add);
 	}
 
-	private static BigDecimal total(List<Entry> entries, EntryType type) {
+	private static BigDecimal total(List<Entry> entries, EntryType type, YearMonth month) {
 		return entries.stream()
 			.filter((entry) -> entry.getType() == type)
-			.map(Entry::getAmount)
+			.map((entry) -> entry.amountIn(month))
 			.reduce(BigDecimal.ZERO, BigDecimal::add);
 	}
 

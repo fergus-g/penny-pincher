@@ -272,6 +272,35 @@ legend {
   }
 }
 
+/* Monthly amount or Weekly rate: two inline radios above the amount. */
+fieldset.pricing {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-bottom: -8px;
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--text);
+  }
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 /* A secondary action on the left of the footer, away from Cancel and Save. */
 .side-action {
   margin-right: auto;

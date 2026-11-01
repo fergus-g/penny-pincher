@@ -27,9 +27,19 @@
   </header>
 
   <div class="form-body">
+    @if (type() === 'EXPENSE') {
+      <fieldset class="pricing">
+        <legend class="visually-hidden">Priced</legend>
+        <label
+          ><input type="radio" formControlName="pricing" value="MONTHLY" /> Monthly amount</label
+        >
+        <label><input type="radio" formControlName="pricing" value="WEEKLY" /> Weekly rate</label>
+      </fieldset>
+    }
+
     <div class="pair">
       <div class="field">
-        <label for="entry-amount">Amount</label>
+        <label for="entry-amount">{{ weekly() ? 'Weekly rate' : 'Amount' }}</label>
         <div class="money">
           <span aria-hidden="true">€</span>
           <input
@@ -47,6 +57,9 @@
           } @else if (form.controls.amount.hasError('pattern')) {
             <small class="error">Use at most 2 decimal places</small>
           }
+        }
+        @if (weeklySum(); as sum) {
+          <small class="hint" aria-live="polite">{{ sum }}</small>
         }
       </div>
       <div class="field">

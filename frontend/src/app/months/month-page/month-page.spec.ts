@@ -4,6 +4,7 @@ import { provideRouter } from '@angular/router';
 import { Observable, of } from 'rxjs';
 
 import { MonthApi } from '../month-api';
+import { paydayWeeks } from '../month-label';
 import {
   Account,
   AllocationRequest,
@@ -31,6 +32,8 @@ function entry(
     category: type === 'INCOME' ? 'Salary' : 'Housing',
     name,
     amount,
+    weeklyRate: null,
+    weeks: null,
     account,
     startMonth: '2026-11',
     endMonth: null,
@@ -158,9 +161,14 @@ class FakeMonthApi {
         this.nextId++,
         request.type,
         request.name ?? request.category,
-        request.amount,
+        // A Weekly Rate comes to its rate times the start month's payday weeks, as the backend does.
+        request.weeklyRate !== null
+          ? request.weeklyRate * paydayWeeks(request.startMonth)
+          : request.amount!,
         request.account,
       ),
+      weeklyRate: request.weeklyRate,
+      weeks: request.weeklyRate !== null ? paydayWeeks(request.startMonth) : null,
       category: request.category,
       potId: request.potId,
       dueDay: request.dueDay,
@@ -465,6 +473,80 @@ describe('MonthPage due days', () => {
     page.section('Income').querySelector<HTMLButtonElement>('.add-button')!.click();
     await page.fixture.whenStable();
     expect(page.el.querySelector('dialog #entry-due-day')).toBeNull();
+  });
+});
+
+describe('MonthPage weekly rates', () => {
+  let api: FakeMonthApi;
+
+  beforeEach(() => {
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+      this.open = false;
+    };
+    api = new FakeMonthApi();
+  });
+
+  async function openAddExpense(month: string) {
+    const page = await render(api, month);
+    page.section('Expenses').querySelector<HTMLButtonElement>('.add-button')!.click();
+    await page.fixture.whenStable();
+    return page;
+  }
+
+  function choose(page: Awaited<ReturnType<typeof render>>, pricing: 'MONTHLY' | 'WEEKLY') {
+    const radio = page.el.querySelector<HTMLInputElement>(`dialog input[value="${pricing}"]`)!;
+    radio.click();
+    radio.dispatchEvent(new Event('change'));
+  }
+
+  function type(page: Awaited<ReturnType<typeof render>>, id: string, value: string) {
+    const input = page.el.querySelector<HTMLInputElement>(`dialog #${id}`)!;
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+  }
+
+  it('show the month sum for a Weekly Rate: 4 payday weeks in November 2026, 5 in December', async () => {
+    let page = await openAddExpense('2026-11');
+    choose(page, 'WEEKLY');
+    type(page, 'entry-amount', '180');
+    await page.fixture.whenStable();
+    expect(page.el.querySelector('dialog label[for="entry-amount"]')!.textContent).toContain(
+      'Weekly rate',
+    );
+    expect(page.el.querySelector('dialog .hint')!.textContent).toContain(
+      '€180.00/week × 4 = €720.00 in November 2026',
+    );
+
+    TestBed.resetTestingModule();
+    page = await openAddExpense('2026-12');
+    choose(page, 'WEEKLY');
+    type(page, 'entry-amount', '180');
+    await page.fixture.whenStable();
+    expect(page.el.querySelector('dialog .hint')!.textContent).toContain('× 5 = €900.00');
+  });
+
+  it('save a Weekly Rate instead of an amount, and show it on the row', async () => {
+    const page = await openAddExpense('2026-11');
+    choose(page, 'WEEKLY');
+    type(page, 'entry-category', 'Food');
+    type(page, 'entry-amount', '180');
+    page.el.querySelector('dialog form')!.dispatchEvent(new Event('submit'));
+    await page.fixture.whenStable();
+
+    expect(api.months['2026-11'][0]).toMatchObject({ amount: 720, weeklyRate: 180, weeks: 4 });
+    const row = page.rows('Expenses')[0];
+    expect(row.querySelector('.amount')!.textContent).toContain('€720.00');
+    expect(row.querySelector('.entry-meta')!.textContent).toContain('€180.00/week × 4');
+  });
+
+  it('offer no Weekly Rate for Income', async () => {
+    const page = await render(api);
+    page.section('Income').querySelector<HTMLButtonElement>('.add-button')!.click();
+    await page.fixture.whenStable();
+    expect(page.el.querySelector('dialog input[value="WEEKLY"]')).toBeNull();
   });
 });
 

@@ -136,7 +136,7 @@ class EntryControllerTest {
 	}
 
 	private static EntryResponse laptop() {
-		return new EntryResponse(1L, EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), Account.REVOLUT,
+		return new EntryResponse(1L, EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), null, null, Account.REVOLUT,
 				OCT, OCT, null, 31, 31, Instant.parse("2026-10-31T21:30:43Z"));
 	}
 

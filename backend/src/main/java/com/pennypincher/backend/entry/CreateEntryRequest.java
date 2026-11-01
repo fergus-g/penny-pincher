@@ -15,13 +15,15 @@ import jakarta.validation.constraints.Size;
  * Body of {@code POST /api/entries}. {@code startMonth} is the month being viewed in the
  * app; a one-off entry ends in that same month, otherwise it recurs with no end.
  * {@code potId} makes an Expense a Contribution to that Pot, and {@code dueDay} sets the day of
- * the month it goes out. Both are for Expenses only.
+ * the month it goes out. Give either a monthly {@code amount} or, for an Expense only, a
+ * {@code weeklyRate}. Pot and Due Day are for Expenses only.
  */
 public record CreateEntryRequest(
 		@NotNull EntryType type,
 		@NotBlank @Size(max = 50) String category,
 		@Size(max = 100) String name,
-		@NotNull @Positive @Digits(integer = 10, fraction = 2) BigDecimal amount,
+		@Positive @Digits(integer = 10, fraction = 2) BigDecimal amount,
+		@Positive @Digits(integer = 10, fraction = 2) BigDecimal weeklyRate,
 		Account account,
 		@NotNull YearMonth startMonth,
 		boolean oneOff,

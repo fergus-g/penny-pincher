@@ -19,3 +19,20 @@ export function ordinal(day: number): string {
     : (({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[day % 10] ?? 'th');
   return `${day}${suffix}`;
 }
+
+/** Payday: the last Thursday of a month, given its year and 0-based month index. */
+function payday(year: number, monthIndex: number): Date {
+  const lastDay = new Date(year, monthIndex + 1, 0);
+  // Thursday is day 4; step back to it from the last day of the month.
+  lastDay.setDate(lastDay.getDate() - ((lastDay.getDay() + 3) % 7));
+  return lastDay;
+}
+
+/** The weeks from the previous month's payday to this month's: always 4 or 5. */
+export function paydayWeeks(month: string): number {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const days =
+    (payday(year, monthNumber - 1).getTime() - payday(year, monthNumber - 2).getTime()) /
+    86_400_000;
+  return Math.round(days / 7);
+}
