@@ -51,7 +51,19 @@
       </div>
       <div class="field">
         <label for="entry-category">Category</label>
-        <input id="entry-category" class="text-input" formControlName="category" maxlength="50" />
+        <input
+          id="entry-category"
+          class="text-input"
+          formControlName="category"
+          maxlength="50"
+          list="entry-categories"
+          autocomplete="off"
+        />
+        <datalist id="entry-categories">
+          @for (category of suggestions(); track category) {
+            <option [value]="category"></option>
+          }
+        </datalist>
         @if (form.controls.category.touched && form.controls.category.invalid) {
           <small class="error">Category is required</small>
         }

@@ -150,9 +150,39 @@ class EntryServiceTest {
 		verify(this.entryRepository, never()).delete(any(Entry.class));
 	}
 
+	@Test
+	void expensesByCategorySumToTotalExpensesLargestFirst() {
+		given(this.entryRepository.findActiveIn(OCT)).willReturn(List.of(expense("Housing", "1250.00"),
+				expense("Groceries", "300.00"), expense("Transport", "90.50"), expense("Groceries", "120.00"),
+				new Entry(EntryType.INCOME, "Salary", null, new BigDecimal("3200.00"), Account.AIB, OCT, null)));
+		MonthSummaryResponse summary = this.entryService.getMonth(OCT);
+		assertThat(summary.expensesByCategory()).extracting(CategoryTotal::category)
+			.containsExactly("Housing", "Groceries", "Transport");
+		assertThat(summary.expensesByCategory().stream().map(CategoryTotal::amount).reduce(BigDecimal::add))
+			.hasValueSatisfying((sum) -> assertThat(sum).isEqualByComparingTo(summary.totalExpenses()));
+	}
+
+	@Test
+	void categoryVariantsShareASliceLabelledWithTheMostCommonSpelling() {
+		given(this.entryRepository.findActiveIn(OCT)).willReturn(List.of(expense("groceries ", "10.00"),
+				expense("Groceries", "20.00"), expense(" Groceries", "30.00"), expense("GROCERIES", "40.00")));
+		assertThat(this.entryService.getMonth(OCT).expensesByCategory()).singleElement().satisfies((slice) -> {
+			assertThat(slice.category()).isEqualTo("Groceries");
+			assertThat(slice.amount()).isEqualByComparingTo("100.00");
+		});
+	}
+
+	@Test
+	void getCategoriesMergesVariantsAlphabetically() {
+		given(this.entryRepository.findCategories(EntryType.EXPENSE))
+			.willReturn(List.of("transport", "Groceries", "groceries ", "Groceries", "Housing", "Transport "));
+		assertThat(this.entryService.getCategories(EntryType.EXPENSE)).containsExactly("Groceries", "Housing",
+				"transport");
+	}
+
 	private static CreateEntryRequest createRequest(boolean oneOff) {
-		return new CreateEntryRequest(EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), Account.REVOLUT, OCT,
-				oneOff);
+		return new CreateEntryRequest(EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), Account.REVOLUT,
+				OCT, oneOff);
 	}
 
 	private static Entry entry(EntryType type, String amount) {
@@ -161,6 +191,10 @@ class EntryServiceTest {
 
 	private static Entry entry(EntryType type, String amount, Account account) {
 		return new Entry(type, "Test", null, new BigDecimal(amount), account, OCT, null);
+	}
+
+	private static Entry expense(String category, String amount) {
+		return new Entry(EntryType.EXPENSE, category, null, new BigDecimal(amount), Account.AIB, OCT, null);
 	}
 
 }

@@ -14,6 +14,7 @@ import { rxResource } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 
 import { EntryForm } from '../entry-form/entry-form';
+import { ExpenseChart } from '../expense-chart/expense-chart';
 import { MonthApi } from '../month-api';
 import { monthLabel, toDate } from '../month-label';
 import { accountLabel, Entry, EntryType, HOME_ACCOUNT, MonthSummary } from '../month.model';
@@ -51,7 +52,7 @@ const SECTION = {
 const RECENT_CATEGORIES = 6;
 
 @Component({
-  imports: [CurrencyPipe, EntryForm],
+  imports: [CurrencyPipe, EntryForm, ExpenseChart],
   selector: 'app-month-page',
   styleUrl: './month-page.scss',
   templateUrl: './month-page.html',

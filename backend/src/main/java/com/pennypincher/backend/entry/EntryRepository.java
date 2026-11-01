@@ -12,4 +12,8 @@ public interface EntryRepository extends JpaRepository<Entry, Long> {
 			+ " and (e.endMonth is null or e.endMonth >= :month) order by e.id")
 	List<Entry> findActiveIn(YearMonth month);
 
+	/** Every Entry's category of this type, one per Entry, so repeats show how common a spelling is. */
+	@Query("select e.category from Entry e where e.type = :type")
+	List<String> findCategories(EntryType type);
+
 }

@@ -2,7 +2,13 @@ import { HttpClient } from '@angular/common/http';
 import { inject, Service } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { CreateEntryRequest, Entry, MonthSummary, UpdateEntryRequest } from './month.model';
+import {
+  CreateEntryRequest,
+  Entry,
+  EntryType,
+  MonthSummary,
+  UpdateEntryRequest,
+} from './month.model';
 
 @Service()
 export class MonthApi {
@@ -11,6 +17,12 @@ export class MonthApi {
   getMonth(month: string): Observable<MonthSummary> {
     console.log('[MonthApi] getMonth', month);
     return this.http.get<MonthSummary>(`/api/months/${month}`);
+  }
+
+  /** Every category used on this type of Entry, in any month: autocomplete suggestions. */
+  getCategories(type: EntryType): Observable<string[]> {
+    console.log('[MonthApi] getCategories', type);
+    return this.http.get<string[]>('/api/categories', { params: { type } });
   }
 
   createEntry(request: CreateEntryRequest): Observable<Entry> {
