@@ -63,6 +63,9 @@ const SECTION = {
 
 const euros = new Intl.NumberFormat('en', { style: 'currency', currency: 'EUR' });
 
+/** How many Entry rows a section shows before its list scrolls; matches the CSS. */
+const MAX_ROWS = 5;
+
 /** How many recent categories the add dialog offers as quick picks. */
 const RECENT_CATEGORIES = 6;
 
@@ -198,6 +201,8 @@ export class MonthPage {
   /** True while the form is saving or deleting; the dialog can't be closed then. */
   protected readonly saving = signal(false);
 
+  protected readonly MAX_ROWS = MAX_ROWS;
+
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   /** A just-added Entry waiting to be scrolled to and flashed once its row renders. */
   private readonly pendingReveal = signal<number | null>(null);
@@ -258,10 +263,17 @@ export class MonthPage {
     this.summary.reload();
   }
 
-  /** Scrolls the row into view if it's off-screen, then flashes it once it's visible. */
+  /**
+   * Scrolls the row into view if it's off-screen, or out of sight inside its section's scrolling
+   * list, then flashes it once it's visible.
+   */
   private reveal(row: HTMLElement, id: number): void {
     const { top, bottom } = row.getBoundingClientRect();
-    if (top < 0 || bottom > window.innerHeight) {
+    const list = row.closest<HTMLElement>('.rows.scroll')?.getBoundingClientRect();
+    if (
+      top < Math.max(0, list?.top ?? 0) ||
+      bottom > Math.min(window.innerHeight, list?.bottom ?? Infinity)
+    ) {
       row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
     this.revealObserver?.disconnect();

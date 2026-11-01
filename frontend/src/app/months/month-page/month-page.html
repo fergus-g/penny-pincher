@@ -240,8 +240,15 @@
                   + {{ section.noun }}
                 </button>
               </div>
-              <!-- Always present so the toggle's aria-controls has a target; rows only when open. -->
-              <div [id]="'entries-' + section.type">
+              <!--
+                Always present so the toggle's aria-controls has a target; rows only when open.
+                Past 5 rows the list scrolls inside the card.
+              -->
+              <div
+                class="rows"
+                [class.scroll]="section.entries.length > MAX_ROWS"
+                [id]="'entries-' + section.type"
+              >
                 @if (section.open) {
                   @for (entry of section.entries; track entry.id) {
                     @let badge = kind(entry);
