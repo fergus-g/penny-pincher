@@ -5,6 +5,7 @@ import { Observable, of } from 'rxjs';
 
 import { MonthApi } from '../month-api';
 import {
+  Account,
   AllocationRequest,
   AllocationSummary,
   CreateEntryRequest,
@@ -22,7 +23,7 @@ function entry(
   type: Entry['type'],
   name: string,
   amount: number,
-  account: Entry['account'] = 'AIB',
+  account: Entry['account'] = type === 'EXPENSE' ? 'AIB' : null,
 ): Entry {
   return {
     id,
@@ -46,7 +47,11 @@ function summary(
 ): MonthSummary {
   const total = (type: Entry['type'], on = entries) =>
     on.filter((e) => e.type === type).reduce((sum, e) => sum + e.amount, 0);
-  const revolut = entries.filter((e) => e.account === 'REVOLUT');
+  const paidFrom = (account: Account) =>
+    total(
+      'EXPENSE',
+      entries.filter((e) => e.account === account),
+    );
   const byCategory = new Map<string, number>();
   for (const e of entries.filter((e) => e.type === 'EXPENSE')) {
     byCategory.set(e.category, (byCategory.get(e.category) ?? 0) + e.amount);
@@ -58,7 +63,8 @@ function summary(
     totalExpenses: total('EXPENSE'),
     remainder: total('INCOME') - total('EXPENSE'),
     transfers: [
-      { account: 'REVOLUT', amount: total('EXPENSE', revolut) - total('INCOME', revolut) },
+      { account: 'AIB', amount: paidFrom('AIB') },
+      { account: 'REVOLUT', amount: paidFrom('REVOLUT') },
     ],
     expensesByCategory: Array.from(byCategory, ([category, amount]) => ({ category, amount })).sort(
       (a, b) => b.amount - a.amount,
@@ -406,32 +412,35 @@ describe('MonthPage transfers', () => {
       li.textContent!.replace(/\s+/g, ' ').trim(),
     );
 
-  it('ask for a Transfer to cover Revolut Expenses', async () => {
+  it("ask to put each Account's Expenses into it", async () => {
     api.months['2026-11'] = [
       entry(1, 'INCOME', 'Salary', 3200),
-      entry(2, 'EXPENSE', 'Netflix', 120, 'REVOLUT'),
-      entry(3, 'EXPENSE', 'Gym', 180, 'REVOLUT'),
+      entry(2, 'EXPENSE', 'Rent', 1250),
+      entry(3, 'EXPENSE', 'Netflix', 120, 'REVOLUT'),
+      entry(4, 'EXPENSE', 'Gym', 180, 'REVOLUT'),
     ];
     const { el } = await render(api);
 
-    expect(transferLines(el)).toEqual(['Transfer €300.00 to Revolut']);
+    expect(transferLines(el)).toEqual(['Put €1,250.00 into AIB', 'Put €300.00 into Revolut']);
   });
 
-  it('ask to move money back to AIB when Revolut Income exceeds its Expenses', async () => {
-    api.months['2026-11'] = [
-      entry(1, 'INCOME', 'Refund', 500, 'REVOLUT'),
-      entry(2, 'EXPENSE', 'Netflix', 120, 'REVOLUT'),
-    ];
-    const { el } = await render(api);
-
-    expect(transferLines(el)).toEqual(['Move €380.00 back to AIB']);
-  });
-
-  it('are hidden with no Revolut activity', async () => {
+  it('always list both Accounts, even with nothing paid out of one', async () => {
     api.months['2026-11'] = [entry(1, 'INCOME', 'Salary', 3200), entry(2, 'EXPENSE', 'Rent', 1250)];
     const { el } = await render(api);
 
-    expect(transfers(el)).toBeNull();
+    expect(transfers(el)).not.toBeNull();
+    expect(transferLines(el)).toEqual(['Put €1,250.00 into AIB', 'Put €0.00 into Revolut']);
+  });
+
+  it('add Income with no Account', async () => {
+    const page = await render(api);
+
+    page.section('Income').querySelector<HTMLButtonElement>('.add-button')!.click();
+    await page.fixture.whenStable();
+    expect(page.el.querySelector('dialog #entry-account')).toBeNull();
+    await addEntry(page, 'Income', { category: 'Salary', name: 'Pay', amount: '3000' });
+
+    expect(api.months['2026-11'][0]).toMatchObject({ type: 'INCOME', account: null });
   });
 
   it('pick up a new Entry added on Revolut, which shows its Account', async () => {
@@ -446,7 +455,7 @@ describe('MonthPage transfers', () => {
 
     expect(api.months['2026-11'][0].account).toBe('REVOLUT');
     expect(page.rows('Expenses')[0].textContent).toContain('Subscriptions · Revolut');
-    expect(transferLines(page.el)).toEqual(['Transfer €12.00 to Revolut']);
+    expect(transferLines(page.el)).toEqual(['Put €0.00 into AIB', 'Put €12.00 into Revolut']);
   });
 });
 
@@ -775,7 +784,6 @@ describe('MonthPage allocation', () => {
       effectiveFrom: '2026-11',
       savings: 400,
       allowance: 200,
-      allowanceAccount: 'REVOLUT',
       debtRepayment: 400,
       shortfall: false,
       savingsPotId: 2,
@@ -803,7 +811,7 @@ describe('MonthPage allocation', () => {
 
     expect(shares(el)).toEqual([
       'Savings €400.00 Rainy day',
-      'Allowance €200.00 Revolut',
+      'Allowance €200.00 Spending money',
       'Debt Repayment €400.00 Car loan',
     ]);
     expect(card(el)).not.toContain('Shortfall');
@@ -818,7 +826,7 @@ describe('MonthPage allocation', () => {
     expect(card(el)).toContain("They're still transferred in full");
     expect(shares(el)).toEqual([
       'Savings €400.00 Rainy day',
-      'Allowance €200.00 Revolut',
+      'Allowance €200.00 Spending money',
       'Debt Repayment €0.00 Car loan',
     ]);
   });
@@ -866,7 +874,6 @@ describe('MonthPage allocation', () => {
         request: {
           savings: 400,
           allowance: 200,
-          allowanceAccount: 'AIB',
           savingsPotId: null,
           debtPotId: 1,
         },

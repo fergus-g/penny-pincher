@@ -86,19 +86,21 @@
       </div>
     }
 
-    <div class="pair">
+    <div [class.pair]="type() === 'EXPENSE'" [class.field]="type() === 'INCOME'">
       <div class="field">
         <label for="entry-name">Name <span class="optional">(optional)</span></label>
         <input id="entry-name" class="text-input" formControlName="name" maxlength="100" />
       </div>
-      <div class="field">
-        <label for="entry-account">{{ type() === 'INCOME' ? 'Lands in' : 'Paid from' }}</label>
-        <select id="entry-account" class="text-input" formControlName="account">
-          @for (account of accounts; track account.value) {
-            <option [value]="account.value">{{ account.label }}</option>
-          }
-        </select>
-      </div>
+      @if (type() === 'EXPENSE') {
+        <div class="field">
+          <label for="entry-account">Paid from</label>
+          <select id="entry-account" class="text-input" formControlName="account">
+            @for (account of accounts; track account.value) {
+              <option [value]="account.value">{{ account.label }}</option>
+            }
+          </select>
+        </div>
+      }
     </div>
 
     @if (type() === 'EXPENSE' && potOptions().length > 0) {

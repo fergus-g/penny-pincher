@@ -3,7 +3,6 @@ package com.pennypincher.backend.entry;
 import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.pennypincher.backend.allocation.AllocationSummary;
 import com.pennypincher.backend.pot.PotMonth;
 import com.pennypincher.backend.pot.PotService;
 
@@ -40,7 +40,7 @@ class EntryServiceTest {
 	/** No Pots and no Allocation unless a test says otherwise. */
 	@BeforeEach
 	void noPots() {
-		given(this.potService.monthOf(any(YearMonth.class))).willReturn(new PotMonth(List.of(), null, Map.of()));
+		given(this.potService.monthOf(any(YearMonth.class))).willReturn(new PotMonth(List.of(), null));
 	}
 
 	@Test
@@ -70,12 +70,9 @@ class EntryServiceTest {
 
 	@Test
 	void incomeCannotPayIntoAPot() {
-		CreateEntryRequest request = new CreateEntryRequest(EntryType.INCOME, "Salary", null, BigDecimal.TEN,
-				Account.AIB, OCT, false, 7L);
-		assertThatThrownBy(() -> this.entryService.create(request)).isInstanceOfSatisfying(
-				ResponseStatusException.class,
-				(ex) -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
-		verify(this.entryRepository, never()).save(any(Entry.class));
+		CreateEntryRequest request = new CreateEntryRequest(EntryType.INCOME, "Salary", null, BigDecimal.TEN, null,
+				OCT, false, 7L);
+		assertBadRequest(() -> this.entryService.create(request));
 	}
 
 	@Test
@@ -118,41 +115,56 @@ class EntryServiceTest {
 	}
 
 	@Test
-	void transferCoversExpensesOnRevolut() {
+	void transfersPutEachAccountsExpensesIntoIt() {
 		given(this.entryRepository.findActiveIn(OCT)).willReturn(List.of(entry(EntryType.INCOME, "2500.00"),
 				entry(EntryType.EXPENSE, "1000.00"), entry(EntryType.EXPENSE, "200.00", Account.REVOLUT),
 				entry(EntryType.EXPENSE, "100.00", Account.REVOLUT)));
-		assertThat(this.entryService.getMonth(OCT).transfers()).singleElement().satisfies((transfer) -> {
-			assertThat(transfer.account()).isEqualTo(Account.REVOLUT);
-			assertThat(transfer.amount()).isEqualByComparingTo("300.00");
-		});
+		List<Transfer> transfers = this.entryService.getMonth(OCT).transfers();
+		assertThat(transfers).extracting(Transfer::account).containsExactly(Account.AIB, Account.REVOLUT);
+		assertThat(transfers.get(0).amount()).isEqualByComparingTo("1000.00");
+		assertThat(transfers.get(1).amount()).isEqualByComparingTo("300.00");
 	}
 
 	@Test
-	void transferIsNegativeWhenRevolutIncomeExceedsItsExpenses() {
-		given(this.entryRepository.findActiveIn(OCT)).willReturn(List.of(
-				entry(EntryType.INCOME, "500.00", Account.REVOLUT), entry(EntryType.EXPENSE, "120.00", Account.REVOLUT)));
-		assertThat(this.entryService.getMonth(OCT).transfers().get(0).amount()).isEqualByComparingTo("-380.00");
-	}
-
-	@Test
-	void transferIsZeroWithNoRevolutActivity() {
-		given(this.entryRepository.findActiveIn(OCT))
-			.willReturn(List.of(entry(EntryType.INCOME, "2500.00"), entry(EntryType.EXPENSE, "1000.00")));
-		assertThat(this.entryService.getMonth(OCT).transfers()).singleElement().satisfies((transfer) -> {
-			assertThat(transfer.account()).isEqualTo(Account.REVOLUT);
-			assertThat(transfer.amount()).isZero();
-		});
-	}
-
-	@Test
-	void transferAddsWhatTheAllocationSendsToRevolut() {
+	void anAllocationDoesNotChangeTransfers() {
 		given(this.entryRepository.findActiveIn(OCT))
 			.willReturn(List.of(entry(EntryType.INCOME, "2500.00"), entry(EntryType.EXPENSE, "100.00", Account.REVOLUT)));
-		given(this.potService.monthOf(OCT)).willReturn(new PotMonth(List.of(), null,
-				Map.of(Account.REVOLUT, new BigDecimal("600.00"), Account.AIB, new BigDecimal("400.00"))));
-		assertThat(this.entryService.getMonth(OCT).transfers()).singleElement()
-			.satisfies((transfer) -> assertThat(transfer.amount()).isEqualByComparingTo("700.00"));
+		List<Transfer> without = this.entryService.getMonth(OCT).transfers();
+		given(this.potService.monthOf(OCT)).willReturn(new PotMonth(List.of(),
+				new AllocationSummary(OCT, new BigDecimal("400.00"), new BigDecimal("200.00"), new BigDecimal("1800.00"),
+						false, 1L, "Rainy day", 2L, "Car loan", BigDecimal.ZERO, null)));
+		assertThat(this.entryService.getMonth(OCT).transfers()).isEqualTo(without);
+	}
+
+	@Test
+	void transfersListEveryAccountEvenWithNothingPaidOutOfIt() {
+		given(this.entryRepository.findActiveIn(OCT))
+			.willReturn(List.of(entry(EntryType.INCOME, "2500.00"), entry(EntryType.EXPENSE, "1000.00")));
+		List<Transfer> transfers = this.entryService.getMonth(OCT).transfers();
+		assertThat(transfers).extracting(Transfer::account).containsExactly(Account.AIB, Account.REVOLUT);
+		assertThat(transfers.get(1).amount()).isZero();
+	}
+
+	@Test
+	void incomeCannotHaveAnAccount() {
+		CreateEntryRequest request = new CreateEntryRequest(EntryType.INCOME, "Salary", null, BigDecimal.TEN,
+				Account.AIB, OCT, false, null);
+		assertBadRequest(() -> this.entryService.create(request));
+	}
+
+	@Test
+	void anExpenseNeedsAnAccount() {
+		CreateEntryRequest request = new CreateEntryRequest(EntryType.EXPENSE, "Rent", null, BigDecimal.TEN, null,
+				OCT, false, null);
+		assertBadRequest(() -> this.entryService.create(request));
+	}
+
+	@Test
+	void incomeIsCreatedWithoutAnAccount() {
+		given(this.entryRepository.save(any(Entry.class))).willAnswer((invocation) -> invocation.getArgument(0));
+		EntryResponse response = this.entryService.create(new CreateEntryRequest(EntryType.INCOME, "Salary", null,
+				BigDecimal.TEN, null, OCT, false, null));
+		assertThat(response.account()).isNull();
 	}
 
 	@Test
@@ -206,7 +218,7 @@ class EntryServiceTest {
 	void expensesByCategorySumToTotalExpensesLargestFirst() {
 		given(this.entryRepository.findActiveIn(OCT)).willReturn(List.of(expense("Housing", "1250.00"),
 				expense("Groceries", "300.00"), expense("Transport", "90.50"), expense("Groceries", "120.00"),
-				new Entry(EntryType.INCOME, "Salary", null, new BigDecimal("3200.00"), Account.AIB, OCT, null)));
+				new Entry(EntryType.INCOME, "Salary", null, new BigDecimal("3200.00"), null, OCT, null)));
 		MonthSummaryResponse summary = this.entryService.getMonth(OCT);
 		assertThat(summary.expensesByCategory()).extracting(CategoryTotal::category)
 			.containsExactly("Housing", "Groceries", "Transport");
@@ -237,8 +249,15 @@ class EntryServiceTest {
 				OCT, oneOff, null);
 	}
 
+	private void assertBadRequest(Runnable action) {
+		assertThatThrownBy(action::run).isInstanceOfSatisfying(ResponseStatusException.class,
+				(ex) -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+		verify(this.entryRepository, never()).save(any(Entry.class));
+	}
+
+	/** Income gets no Account; an Expense is on AIB. */
 	private static Entry entry(EntryType type, String amount) {
-		return entry(type, amount, Account.AIB);
+		return entry(type, amount, (type == EntryType.EXPENSE) ? Account.AIB : null);
 	}
 
 	private static Entry entry(EntryType type, String amount, Account account) {

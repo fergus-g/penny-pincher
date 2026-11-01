@@ -64,7 +64,7 @@ class EntryControllerTest {
 			.hasStatus(HttpStatus.BAD_REQUEST)
 			.bodyJson()
 			.isLenientlyEqualTo("""
-					{"errors":{"category":"must not be blank","amount":"must be greater than 0","account":"must not be null"}}
+					{"errors":{"category":"must not be blank","amount":"must be greater than 0"}}
 					""");
 		verifyNoInteractions(this.entryService);
 	}
@@ -73,10 +73,10 @@ class EntryControllerTest {
 	void getMonthReturnsSummary() {
 		given(this.entryService.getMonth(OCT)).willReturn(new MonthSummaryResponse(OCT, List.of(laptop()),
 				BigDecimal.ZERO, new BigDecimal("300.50"), new BigDecimal("-300.50"),
-				List.of(new Transfer(Account.REVOLUT, new BigDecimal("300.50"))),
+				List.of(new Transfer(Account.AIB, BigDecimal.ZERO), new Transfer(Account.REVOLUT, new BigDecimal("300.50"))),
 				List.of(new CategoryTotal("Tech", new BigDecimal("300.50"))), List.of(), null));
 		assertThat(this.mvc.get().uri("/api/months/2026-10")).hasStatusOk().bodyJson().isLenientlyEqualTo("""
-				{"month":"2026-10","entries":[{"id":1}],"totalExpenses":300.50,"remainder":-300.50,"transfers":[{"account":"REVOLUT","amount":300.50}],
+				{"month":"2026-10","entries":[{"id":1}],"totalExpenses":300.50,"remainder":-300.50,"transfers":[{"account":"AIB","amount":0},{"account":"REVOLUT","amount":300.50}],
 				"expensesByCategory":[{"category":"Tech","amount":300.50}]}
 				""");
 	}

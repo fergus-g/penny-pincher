@@ -170,19 +170,6 @@ class MonthLedgerTest {
 		assertThat(february.allocation().debtPotId()).isNull();
 		assertThat(balance(loan, FEB)).isEqualByComparingTo("5000.00");
 		assertThat(balance(rainyDay, FEB)).isEqualByComparingTo("1000.00");
-		assertThat(february.allocationMoves()).containsOnlyKeys(Account.AIB);
-	}
-
-	@Test
-	void savingsAndAllowanceToRevolutAreMovedThereTogether() {
-		Pot revolutSavings = pot(1L, PotKind.SAVINGS, "0.00", JAN, Account.REVOLUT);
-		Pot loan = pot(2L, PotKind.LOAN, "5000.00", JAN, Account.AIB);
-		remainderOf("1000.00", JAN);
-		allocate(FEB, "400.00", "200.00", revolutSavings, loan);
-		this.allocations.get(0).setAllowanceAccount(Account.REVOLUT);
-		PotMonth february = MonthLedger.run(FEB, this.pots, this.checkIns, this.entries, this.allocations);
-		assertThat(february.allocationMoves().get(Account.REVOLUT)).isEqualByComparingTo("600.00");
-		assertThat(february.allocationMoves().get(Account.AIB)).isEqualByComparingTo("400.00");
 	}
 
 	private BigDecimal balance(Pot pot, YearMonth month) {
@@ -218,14 +205,13 @@ class MonthLedgerTest {
 
 	/** A recurring Income from {@code month}, so that's each month's Remainder. */
 	private void remainderOf(String amount, YearMonth month) {
-		this.entries.add(new Entry(EntryType.INCOME, "Salary", null, new BigDecimal(amount), Account.AIB, month, null));
+		this.entries.add(new Entry(EntryType.INCOME, "Salary", null, new BigDecimal(amount), null, month, null));
 	}
 
 	private void allocate(YearMonth from, String savings, String allowance, Pot savingsPot, Pot debtPot) {
 		Allocation allocation = new Allocation(from);
 		allocation.setSavings(new BigDecimal(savings));
 		allocation.setAllowance(new BigDecimal(allowance));
-		allocation.setAllowanceAccount(Account.AIB);
 		allocation.setSavingsPotId((savingsPot != null) ? savingsPot.getId() : null);
 		allocation.setDebtPotId((debtPot != null) ? debtPot.getId() : null);
 		this.allocations.add(allocation);

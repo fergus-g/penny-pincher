@@ -37,7 +37,6 @@ public class AllocationService {
 			.orElseGet(() -> new Allocation(month));
 		allocation.setSavings(request.savings());
 		allocation.setAllowance(request.allowance());
-		allocation.setAllowanceAccount(request.allowanceAccount());
 		allocation.setSavingsPotId(request.savingsPotId());
 		allocation.setDebtPotId(request.debtPotId());
 		return AllocationResponse.from(this.allocationRepository.save(allocation));

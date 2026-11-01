@@ -3,8 +3,6 @@ package com.pennypincher.backend.allocation;
 import java.math.BigDecimal;
 import java.time.YearMonth;
 
-import com.pennypincher.backend.entry.Account;
-
 /**
  * How one month's Remainder is split by the Allocation in force. A null Pot means that share
  * is unassigned and moves no balance.
@@ -19,7 +17,6 @@ public record AllocationSummary(
 		YearMonth effectiveFrom,
 		BigDecimal savings,
 		BigDecimal allowance,
-		Account allowanceAccount,
 		BigDecimal debtRepayment,
 		boolean shortfall,
 		Long savingsPotId,

@@ -1,14 +1,12 @@
 package com.pennypincher.backend.entry;
 
 /**
- * The bank account an Entry is paid out of or lands in.
+ * A joint bank account that Expenses are paid out of, and that needs money put into it each
+ * month (ADR 0002). Income lands in sole accounts the app doesn't track, so it has none.
  */
 public enum Account {
 
 	AIB,
-	REVOLUT;
-
-	/** Income lands here; every other Account is topped up from it by a Transfer. */
-	public static final Account HOME = AIB;
+	REVOLUT
 
 }

@@ -36,8 +36,9 @@ public class Entry {
 	@Column(nullable = false, precision = 12, scale = 2)
 	private BigDecimal amount;
 
+	/** The Account an Expense is paid out of; null for Income. */
 	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 20)
+	@Column(length = 20)
 	private Account account;
 
 	@Convert(converter = YearMonthConverter.class)

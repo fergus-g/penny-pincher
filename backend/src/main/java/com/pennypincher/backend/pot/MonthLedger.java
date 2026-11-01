@@ -3,7 +3,6 @@ package com.pennypincher.backend.pot;
 import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,7 +10,6 @@ import java.util.Optional;
 
 import com.pennypincher.backend.allocation.Allocation;
 import com.pennypincher.backend.allocation.AllocationSummary;
-import com.pennypincher.backend.entry.Account;
 import com.pennypincher.backend.entry.Entry;
 import com.pennypincher.backend.entry.EntryType;
 
@@ -66,8 +64,7 @@ final class MonthLedger {
 			.filter((pot) -> pot.pot.isActiveIn(month))
 			.map(Running::toBalance)
 			.toList();
-		return (split != null) ? new PotMonth(balances, split.summary(pots, running), split.moves(pots))
-				: new PotMonth(balances, null, Map.of());
+		return new PotMonth(balances, (split != null) ? split.summary(pots, running) : null);
 	}
 
 	/** Applies the month's Allocation to the Pots it targets; null with no Allocation in force. */
@@ -200,21 +197,10 @@ final class MonthLedger {
 			Running debt = debtPot.map((pot) -> running.get(pot.getId())).orElse(null);
 			YearMonth paidOffIn = (debt != null && debt.balance.signum() == 0) ? debt.paidOffIn : null;
 			return new AllocationSummary(this.allocation.getEffectiveFrom(), this.allocation.getSavings(),
-					this.allocation.getAllowance(), this.allocation.getAllowanceAccount(), this.debtRepayment,
+					this.allocation.getAllowance(), this.debtRepayment,
 					this.shortfall, savingsPot.map(Pot::getId).orElse(null),
 					savingsPot.map(Pot::getName).orElse(null), debtPot.map(Pot::getId).orElse(null),
 					debtPot.map(Pot::getName).orElse(null), this.overflow, paidOffIn);
-		}
-
-		/** Where the money has to go: Savings and overflow to the Savings Pot's Account, and so on. */
-		Map<Account, BigDecimal> moves(List<Pot> pots) {
-			Map<Account, BigDecimal> moves = new EnumMap<>(Account.class);
-			moves.merge(this.allocation.getAllowanceAccount(), this.allocation.getAllowance(), BigDecimal::add);
-			find(pots, this.allocation.getSavingsPotId()).ifPresent((pot) -> moves.merge(pot.getAccount(),
-					this.allocation.getSavings().add(this.overflow), BigDecimal::add));
-			find(pots, this.allocation.getDebtPotId())
-				.ifPresent((pot) -> moves.merge(pot.getAccount(), this.debtPaid, BigDecimal::add));
-			return moves;
 		}
 
 	}

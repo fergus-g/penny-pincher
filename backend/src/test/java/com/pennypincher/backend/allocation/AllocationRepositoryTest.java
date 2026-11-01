@@ -10,8 +10,6 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.dao.DataIntegrityViolationException;
 
-import com.pennypincher.backend.entry.Account;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -54,7 +52,6 @@ class AllocationRepositoryTest {
 		Allocation allocation = new Allocation(from);
 		allocation.setSavings(BigDecimal.ONE);
 		allocation.setAllowance(BigDecimal.ONE);
-		allocation.setAllowanceAccount(Account.AIB);
 		allocation.setSavingsPotId(savingsPotId);
 		this.allocationRepository.saveAndFlush(allocation);
 	}

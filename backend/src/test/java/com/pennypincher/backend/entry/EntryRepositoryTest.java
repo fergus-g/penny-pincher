@@ -4,19 +4,19 @@ import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.List;
 
-import jakarta.persistence.EntityManager;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Runs {@link EntryRepository#findActiveIn} and the migrations against the real MySQL database. Each test
+ * Runs the Entry queries and the migrations' constraints against the real MySQL database. Each test
  * rolls back, and assertions only look at the entries saved here, so existing rows in
  * the database don't affect the results.
  */
@@ -34,9 +34,6 @@ class EntryRepositoryTest {
 
 	@Autowired
 	private EntryRepository entryRepository;
-
-	@Autowired
-	private EntityManager entityManager;
 
 	private Long oneOff;
 
@@ -75,21 +72,20 @@ class EntryRepositoryTest {
 		assertThat(july).doesNotContain(this.oneOff, this.cancelled);
 	}
 
-	/** Rows from before accounts existed have no account column value; V2 defaults them to AIB. */
+	/** V5: Income has no Account, and every Expense has one. */
 	@Test
-	void rowWithoutAnAccountIsOnAib() {
-		this.entityManager
-			.createNativeQuery("insert into entries (type, category, amount, start_month)"
-					+ " values ('EXPENSE', 'Test', 10.00, '2026-03-01')")
-			.executeUpdate();
-		List<Entry> march = this.entryRepository.findActiveIn(MAR);
-		assertThat(march.get(march.size() - 1).getAccount()).isEqualTo(Account.AIB);
+	void onlyExpensesHaveAnAccount() {
+		assertThatThrownBy(() -> this.entryRepository
+			.saveAndFlush(new Entry(EntryType.INCOME, "Salary", null, BigDecimal.TEN, Account.AIB, MAR, null)))
+			.isInstanceOf(DataIntegrityViolationException.class);
+		assertThatThrownBy(() -> this.entryRepository
+			.saveAndFlush(new Entry(EntryType.EXPENSE, "Rent", null, BigDecimal.TEN, null, MAR, null)))
+			.isInstanceOf(DataIntegrityViolationException.class);
 	}
 
 	@Test
 	void findCategoriesReturnsOnePerEntryOfThatTypeOnly() {
-		this.entryRepository.save(new Entry(EntryType.INCOME, "Salary-test", null, BigDecimal.TEN, Account.AIB, MAR,
-				null));
+		this.entryRepository.save(new Entry(EntryType.INCOME, "Salary-test", null, BigDecimal.TEN, null, MAR, null));
 		List<String> categories = this.entryRepository.findCategories(EntryType.EXPENSE);
 		assertThat(categories).filteredOn("Test"::equals).hasSizeGreaterThanOrEqualTo(3);
 		assertThat(categories).doesNotContain("Salary-test");

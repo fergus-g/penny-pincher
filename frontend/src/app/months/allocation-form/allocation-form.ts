@@ -5,7 +5,7 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { errorMessage } from '../error-message';
 import { MonthApi } from '../month-api';
 import { monthLabel } from '../month-label';
-import { Account, ACCOUNTS, AllocationSummary, HOME_ACCOUNT, isDebt, Pot } from '../month.model';
+import { AllocationSummary, isDebt, Pot } from '../month.model';
 
 /** At least 0, at most 2 decimal places, matching the backend's @Digits(fraction = 2). */
 const MONEY = [Validators.required, Validators.min(0), Validators.pattern(/^\d+(\.\d{1,2})?$/)];
@@ -59,12 +59,10 @@ export class AllocationForm implements OnInit {
     this.openPots().filter((pot) => !isDebt(pot.kind)),
   );
   protected readonly debtPots = computed(() => this.openPots().filter((pot) => isDebt(pot.kind)));
-  protected readonly accounts = ACCOUNTS;
 
   protected readonly form = new FormGroup({
     savings: new FormControl<number | null>(null, MONEY),
     allowance: new FormControl<number | null>(null, MONEY),
-    allowanceAccount: new FormControl<Account>(HOME_ACCOUNT, { nonNullable: true }),
     savingsPotId: new FormControl<number | null>(null),
     debtPotId: new FormControl<number | null>(null),
   });
@@ -75,7 +73,6 @@ export class AllocationForm implements OnInit {
       this.form.setValue({
         savings: current.savings,
         allowance: current.allowance,
-        allowanceAccount: current.allowanceAccount,
         savingsPotId: current.savingsPotId,
         debtPotId: current.debtPotId,
       });
@@ -87,15 +84,13 @@ export class AllocationForm implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
-    const { savings, allowance, allowanceAccount, savingsPotId, debtPotId } =
-      this.form.getRawValue();
+    const { savings, allowance, savingsPotId, debtPotId } = this.form.getRawValue();
     this.saving.set(true);
     this.error.set(null);
     this.monthApi
       .saveAllocation(this.month(), {
         savings: savings!,
         allowance: allowance!,
-        allowanceAccount,
         savingsPotId,
         debtPotId,
       })

@@ -19,12 +19,20 @@ An Entry for money going out.
 _Avoid_: Outgoing, cost, debit
 
 **Account**:
-The bank account an Entry is paid out of or lands in (currently AIB or Revolut).
-_Avoid_: Target, transferTo, bank
+A joint bank account that Expenses are paid out of (currently AIB or Revolut). Income has no Account: it lands in sole accounts the app doesn't track. No Account is "home" (ADR 0002).
+_Avoid_: Target, transferTo, bank, home account
 
 **Transfer**:
-The amount that must be moved into an Account in a month to cover what goes out of it.
+The amount to put into an Account in a month: the total of the Expenses paid out of it. Every Account has one each month, even at zero.
 _Avoid_: Top-up, movement
+
+**Due Day**:
+The day of the month an Expense goes out of its Account, from 1 to 31. In a shorter month it falls on the last day (the 31st is the 30th in November). Optional; Income has none.
+_Avoid_: Due date, payment day
+
+**Weekly Rate**:
+An Expense priced per week instead of per month. Its amount in a month is the rate times the weeks from the last Thursday of the previous month to the last Thursday of that month (payday to payday), always 4 or 5.
+_Avoid_: Weekly amount, per-week cost
 
 **Remainder**:
 Total Income minus total Expenses for a month. Shown to users as "Left over this month".
@@ -41,7 +49,7 @@ The fixed part of an Allocation set aside to grow savings.
 _Avoid_: Saving value
 
 **Allowance**:
-The fixed part of an Allocation kept as personal spending money.
+The fixed part of an Allocation kept as personal spending money. It has no Account and isn't part of any Transfer.
 _Avoid_: Personal income, pocket money
 
 **Debt Repayment**:
