@@ -48,6 +48,10 @@ public class Entry {
 	@Column(name = "end_month")
 	private YearMonth endMonth;
 
+	/** The Pot this Expense is a Contribution to; null for most Entries, and always for Income. */
+	@Column(name = "pot_id")
+	private Long potId;
+
 	@CreationTimestamp
 	@Column(name = "created_at", nullable = false, updatable = false)
 	private Instant createdAt;
@@ -64,6 +68,11 @@ public class Entry {
 		this.account = account;
 		this.startMonth = startMonth;
 		this.endMonth = endMonth;
+	}
+
+	/** Started by this month and not ended before it. */
+	public boolean isActiveIn(YearMonth month) {
+		return !this.startMonth.isAfter(month) && (this.endMonth == null || !this.endMonth.isBefore(month));
 	}
 
 	public Long getId() {
@@ -120,6 +129,14 @@ public class Entry {
 
 	public void setEndMonth(YearMonth endMonth) {
 		this.endMonth = endMonth;
+	}
+
+	public Long getPotId() {
+		return this.potId;
+	}
+
+	public void setPotId(Long potId) {
+		this.potId = potId;
 	}
 
 	public Instant getCreatedAt() {

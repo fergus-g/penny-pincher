@@ -1,0 +1,117 @@
+<form [formGroup]="form" (ngSubmit)="submit()" aria-labelledby="pot-form-title">
+  <header class="form-header">
+    <div class="heading">
+      <h2 id="pot-form-title">{{ title() }}</h2>
+      <p class="subtitle">Savings, or a loan, overdraft or credit card you're paying off</p>
+    </div>
+    <button
+      type="button"
+      class="close"
+      aria-label="Close"
+      [disabled]="saving()"
+      (click)="cancelled.emit()"
+    >
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        aria-hidden="true"
+      >
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </button>
+  </header>
+
+  <div class="form-body">
+    <div class="field">
+      <label for="pot-name">Name</label>
+      <input id="pot-name" class="text-input" formControlName="name" maxlength="50" />
+      @if (form.controls.name.touched && form.controls.name.invalid) {
+        <small class="error">Name is required</small>
+      }
+    </div>
+
+    <div class="pair">
+      <div class="field">
+        <label for="pot-kind">Kind</label>
+        <select id="pot-kind" class="text-input" formControlName="kind">
+          @for (kind of kinds; track kind.value) {
+            <option [value]="kind.value">{{ kind.label }}</option>
+          }
+        </select>
+      </div>
+      <div class="field">
+        <label for="pot-account">Account</label>
+        <select id="pot-account" class="text-input" formControlName="account">
+          @for (account of accounts; track account.value) {
+            <option [value]="account.value">{{ account.label }}</option>
+          }
+        </select>
+      </div>
+    </div>
+
+    <div class="pair">
+      <div class="field">
+        <label for="pot-opening-balance">{{
+          form.controls.kind.value === 'SAVINGS' ? 'Saved' : 'Owed'
+        }}</label>
+        <div class="money">
+          <span aria-hidden="true">€</span>
+          <input
+            id="pot-opening-balance"
+            type="number"
+            inputmode="decimal"
+            formControlName="openingBalance"
+            min="0"
+            step="0.01"
+          />
+        </div>
+        @if (form.controls.openingBalance.touched && form.controls.openingBalance.invalid) {
+          <small class="error">Enter 0 or more, at most 2 decimal places</small>
+        }
+      </div>
+      <div class="field">
+        <label for="pot-opening-month">At the end of</label>
+        <input
+          id="pot-opening-month"
+          class="text-input"
+          type="month"
+          formControlName="openingMonth"
+        />
+      </div>
+    </div>
+
+    @if (error(); as error) {
+      <p class="error" role="alert">{{ error }}</p>
+    }
+  </div>
+
+  <footer class="form-footer">
+    @if (pot()) {
+      <button
+        type="button"
+        class="delete"
+        [class.confirming]="confirmingDelete()"
+        [disabled]="saving()"
+        (click)="delete()"
+      >
+        {{ confirmingDelete() ? 'Confirm delete' : 'Delete' }}
+      </button>
+      <button type="button" class="secondary" [disabled]="saving()" (click)="archive()">
+        Archive from {{ monthLabel() }}
+      </button>
+    }
+    <div class="actions">
+      <button type="button" class="secondary" [disabled]="saving()" (click)="cancelled.emit()">
+        Cancel
+      </button>
+      <button type="submit" class="primary" [disabled]="saving()">
+        {{ saving() ? 'Saving…' : pot() ? 'Save changes' : 'Add pot' }}
+      </button>
+    </div>
+  </footer>
+</form>

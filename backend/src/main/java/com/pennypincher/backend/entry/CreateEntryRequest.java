@@ -12,6 +12,7 @@ import jakarta.validation.constraints.Size;
 /**
  * Body of {@code POST /api/entries}. {@code startMonth} is the month being viewed in the
  * app; a one-off entry ends in that same month, otherwise it recurs with no end.
+ * {@code potId} makes an Expense a Contribution to that Pot.
  */
 public record CreateEntryRequest(
 		@NotNull EntryType type,
@@ -20,5 +21,6 @@ public record CreateEntryRequest(
 		@NotNull @Positive @Digits(integer = 10, fraction = 2) BigDecimal amount,
 		@NotNull Account account,
 		@NotNull YearMonth startMonth,
-		boolean oneOff) {
+		boolean oneOff,
+		Long potId) {
 }

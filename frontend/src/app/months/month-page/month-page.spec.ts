@@ -1,10 +1,18 @@
 import { DeferBlockState, TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { provideRouter } from '@angular/router';
-import { Observable, of } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Observable, of, throwError } from 'rxjs';
 
 import { MonthApi } from '../month-api';
-import { CreateEntryRequest, Entry, MonthSummary } from '../month.model';
+import {
+  CreateEntryRequest,
+  CreatePotRequest,
+  Entry,
+  MonthSummary,
+  Pot,
+  PotBalance,
+} from '../month.model';
 import { MonthPage } from './month-page';
 
 function entry(
@@ -23,11 +31,12 @@ function entry(
     account,
     startMonth: '2026-11',
     endMonth: null,
+    potId: null,
     createdAt: '2026-11-01T00:00:00Z',
   };
 }
 
-function summary(month: string, entries: Entry[]): MonthSummary {
+function summary(month: string, entries: Entry[], pots: PotBalance[] = []): MonthSummary {
   const total = (type: Entry['type'], on = entries) =>
     on.filter((e) => e.type === type).reduce((sum, e) => sum + e.amount, 0);
   const revolut = entries.filter((e) => e.account === 'REVOLUT');
@@ -47,16 +56,50 @@ function summary(month: string, entries: Entry[]): MonthSummary {
     expensesByCategory: Array.from(byCategory, ([category, amount]) => ({ category, amount })).sort(
       (a, b) => b.amount - a.amount,
     ),
+    pots,
   };
 }
 
 /** A month API backed by an in-memory list of months, so the page sees real responses. */
 class FakeMonthApi {
   months: Record<string, Entry[]> = {};
+  /** Every Pot, and each month's Pot balances as the backend would calculate them. */
+  pots: Pot[] = [];
+  potBalances: Record<string, PotBalance[]> = {};
+  checkIns: { potId: number; month: string; balance: number }[] = [];
   nextId = 100;
 
   getMonth(month: string): Observable<MonthSummary> {
-    return of(summary(month, this.months[month] ?? []));
+    return of(summary(month, this.months[month] ?? [], this.potBalances[month] ?? []));
+  }
+
+  getPots(): Observable<Pot[]> {
+    return of(this.pots);
+  }
+
+  createPot(request: CreatePotRequest): Observable<Pot> {
+    const pot: Pot = { id: this.nextId++, ...request, archivedFrom: null };
+    this.pots = [...this.pots, pot];
+    const { id, name, kind, account, openingBalance } = pot;
+    this.potBalances[request.openingMonth] = [
+      ...(this.potBalances[request.openingMonth] ?? []),
+      { id, name, kind, account, balance: openingBalance, checkedIn: false },
+    ];
+    return of(pot);
+  }
+
+  /** Refuses like the backend does for a Pot with Contributions. */
+  deletePot(id: number): Observable<void> {
+    const detail = `Pot ${id} has Contributions; archive it instead`;
+    return throwError(() => new HttpErrorResponse({ status: 409, error: { detail } }));
+  }
+
+  checkIn(potId: number, month: string, balance: number): Observable<unknown> {
+    this.checkIns.push({ potId, month, balance });
+    this.potBalances[month] = (this.potBalances[month] ?? []).map((pot) =>
+      pot.id === potId ? { ...pot, balance, checkedIn: true } : pot,
+    );
+    return of({ month, balance });
   }
 
   getCategories(type: Entry['type']): Observable<string[]> {
@@ -74,6 +117,7 @@ class FakeMonthApi {
         request.account,
       ),
       category: request.category,
+      potId: request.potId,
     };
     this.months[request.startMonth] = [...(this.months[request.startMonth] ?? []), created];
     return of(created);
@@ -462,5 +506,154 @@ describe('Entry form category autocomplete', () => {
       (option) => option.value,
     );
     expect(options).toEqual(['Transport']);
+  });
+});
+
+describe('MonthPage pots', () => {
+  let api: FakeMonthApi;
+
+  beforeEach(() => {
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+      this.open = false;
+    };
+    api = new FakeMonthApi();
+    api.pots = [
+      {
+        id: 1,
+        name: 'Car loan',
+        kind: 'LOAN',
+        account: 'AIB',
+        openingBalance: 5000,
+        openingMonth: '2026-01',
+        archivedFrom: null,
+      },
+      {
+        id: 2,
+        name: 'Rainy day',
+        kind: 'SAVINGS',
+        account: 'REVOLUT',
+        openingBalance: 1200,
+        openingMonth: '2026-01',
+        archivedFrom: null,
+      },
+    ];
+    api.potBalances['2026-11'] = [
+      { id: 1, name: 'Car loan', kind: 'LOAN', account: 'AIB', balance: 4750, checkedIn: false },
+      {
+        id: 2,
+        name: 'Rainy day',
+        kind: 'SAVINGS',
+        account: 'REVOLUT',
+        balance: 1300,
+        checkedIn: true,
+      },
+    ];
+  });
+
+  /** Each Pot row's visible text, whitespace collapsed. */
+  const potRows = (el: HTMLElement) =>
+    Array.from(el.querySelectorAll<HTMLElement>('section.pots .pot'), (row) =>
+      row.textContent!.replace(/\s+/g, ' ').trim(),
+    );
+
+  /** Sets form fields by id, firing the event Angular's forms listen for. */
+  function fill(el: HTMLElement, values: Record<string, string>) {
+    for (const [id, value] of Object.entries(values)) {
+      const field = el.querySelector<HTMLInputElement | HTMLSelectElement>(`dialog #${id}`)!;
+      field.value = value;
+      field.dispatchEvent(new Event(field.tagName === 'SELECT' ? 'change' : 'input'));
+    }
+  }
+
+  it('show each Pot with its balance, debts negative', async () => {
+    const { el } = await render(api);
+
+    const rows = potRows(el);
+    expect(rows[0]).toContain('Car loan');
+    expect(rows[0]).toContain('Loan · AIB');
+    expect(rows[0]).toContain('-€4,750.00');
+    expect(rows[1]).toContain('Savings · Revolut');
+    expect(rows[1]).toContain('€1,300.00');
+    expect(rows[1]).toContain('Checked in');
+  });
+
+  it('add a Pot that opens in the month being viewed', async () => {
+    const page = await render(api);
+
+    page.el.querySelector<HTMLButtonElement>('section.pots .add-button')!.click();
+    await page.fixture.whenStable();
+    fill(page.el, {
+      'pot-name': 'Credit card',
+      'pot-kind': 'CREDIT_CARD',
+      'pot-opening-balance': '300',
+    });
+    page.el.querySelector('dialog form')!.dispatchEvent(new Event('submit'));
+    await page.fixture.whenStable();
+
+    expect(api.pots.at(-1)).toMatchObject({
+      name: 'Credit card',
+      kind: 'CREDIT_CARD',
+      openingBalance: 300,
+      openingMonth: '2026-11',
+    });
+    expect(potRows(page.el).at(-1)).toContain('-€300.00');
+  });
+
+  it('check in a Pot, starting from its current balance', async () => {
+    const page = await render(api);
+
+    page.el.querySelector<HTMLButtonElement>('section.pots .check-in-button')!.click();
+    await page.fixture.whenStable();
+    const balance = page.el.querySelector<HTMLInputElement>('dialog #check-in-balance')!;
+    expect(balance.value).toBe('4750');
+    fill(page.el, { 'check-in-balance': '4000' });
+    page.el.querySelector('dialog form')!.dispatchEvent(new Event('submit'));
+    await page.fixture.whenStable();
+
+    expect(api.checkIns).toEqual([{ potId: 1, month: '2026-11', balance: 4000 }]);
+    expect(potRows(page.el)[0]).toContain('-€4,000.00');
+    expect(potRows(page.el)[0]).toContain('Checked in');
+  });
+
+  it('explain why a Pot with Contributions cannot be deleted', async () => {
+    const page = await render(api);
+
+    page.el.querySelector<HTMLButtonElement>('section.pots .pot-main')!.click();
+    await page.fixture.whenStable();
+    const deleteButton = () => page.el.querySelector<HTMLButtonElement>('dialog button.delete')!;
+    deleteButton().click();
+    await page.fixture.whenStable();
+    deleteButton().click();
+    await page.fixture.whenStable();
+
+    expect(page.el.querySelector('dialog [role="alert"]')!.textContent).toContain(
+      'archive it instead',
+    );
+  });
+
+  it('let an Expense pay into a Pot, but not Income', async () => {
+    const page = await render(api);
+
+    page.section('Expenses').querySelector<HTMLButtonElement>('.add-button')!.click();
+    await page.fixture.whenStable();
+    const select = page.el.querySelector<HTMLSelectElement>('dialog #entry-pot')!;
+    expect(Array.from(select.options, (option) => option.textContent!.trim())).toEqual([
+      'None',
+      'Car loan',
+      'Rainy day',
+    ]);
+    select.value = select.options[1].value;
+    select.dispatchEvent(new Event('change'));
+    fill(page.el, { 'entry-category': 'Loans', 'entry-amount': '250' });
+    page.el.querySelector('dialog form')!.dispatchEvent(new Event('submit'));
+    await page.fixture.whenStable();
+    expect(api.months['2026-11'].at(-1)).toMatchObject({ category: 'Loans', potId: 1 });
+
+    page.section('Income').querySelector<HTMLButtonElement>('.add-button')!.click();
+    await page.fixture.whenStable();
+    expect(page.el.querySelector('dialog #entry-pot')).toBeNull();
   });
 });

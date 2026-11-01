@@ -13,11 +13,23 @@ import {
 import { rxResource } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 
+import { CheckInForm } from '../check-in-form/check-in-form';
 import { EntryForm } from '../entry-form/entry-form';
 import { ExpenseChart } from '../expense-chart/expense-chart';
 import { MonthApi } from '../month-api';
 import { monthLabel, toDate } from '../month-label';
-import { accountLabel, Entry, EntryType, HOME_ACCOUNT, MonthSummary } from '../month.model';
+import {
+  accountLabel,
+  Entry,
+  EntryType,
+  HOME_ACCOUNT,
+  isDebt,
+  MonthSummary,
+  Pot,
+  PotBalance,
+  potKindLabel,
+} from '../month.model';
+import { PotForm } from '../pot-form/pot-form';
 
 /** The current month as "yyyy-MM". */
 export function currentMonth(): string {
@@ -52,7 +64,7 @@ const SECTION = {
 const RECENT_CATEGORIES = 6;
 
 @Component({
-  imports: [CurrencyPipe, EntryForm, ExpenseChart],
+  imports: [CheckInForm, CurrencyPipe, EntryForm, ExpenseChart, PotForm],
   selector: 'app-month-page',
   styleUrl: './month-page.scss',
   templateUrl: './month-page.html',
@@ -138,6 +150,27 @@ export class MonthPage {
       ].slice(0, RECENT_CATEGORIES);
     return { INCOME: recent('INCOME'), EXPENSE: recent('EXPENSE') };
   });
+
+  /** Every Pot, archived ones too: for editing a Pot and the Expense form's Pot select. */
+  private readonly allPots = rxResource({ stream: () => this.monthApi.getPots() });
+  protected readonly potList = computed(() =>
+    this.allPots.hasValue() ? this.allPots.value() : [],
+  );
+
+  /** This month's Pots, debts shown negative. */
+  protected readonly pots = computed(() =>
+    (this.summary.hasValue() ? this.summary.value().pots : []).map((pot) => ({
+      pot,
+      shown: isDebt(pot.kind) ? -pot.balance : pot.balance,
+      meta: `${potKindLabel(pot.kind)} · ${accountLabel(pot.account)}`,
+    })),
+  );
+
+  private readonly potDialog = viewChild.required<ElementRef<HTMLDialogElement>>('potDialog');
+  /** What the Pot dialog is showing; null while it's closed. */
+  protected readonly potEditing = signal<
+    { form: 'pot'; pot: Pot | null } | { form: 'check-in'; pot: PotBalance } | null
+  >(null);
 
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
   /** What the dialog's form is for; null while the dialog is closed. */
@@ -232,7 +265,36 @@ export class MonthPage {
     this.summary.reload();
   }
 
-  /** Esc fires `cancel` on the dialog; block it while a save is in flight. */
+  protected openAddPot(): void {
+    console.log('[MonthPage] add pot clicked');
+    this.potEditing.set({ form: 'pot', pot: null });
+    this.potDialog().nativeElement.showModal();
+  }
+
+  protected openEditPot(id: number): void {
+    const pot = this.potList().find((candidate) => candidate.id === id);
+    console.log('[MonthPage] edit pot clicked', id);
+    if (pot) {
+      this.potEditing.set({ form: 'pot', pot });
+      this.potDialog().nativeElement.showModal();
+    }
+  }
+
+  protected openCheckIn(pot: PotBalance): void {
+    console.log('[MonthPage] check in clicked', pot.id);
+    this.potEditing.set({ form: 'check-in', pot });
+    this.potDialog().nativeElement.showModal();
+  }
+
+  /** A Pot or Check-in was saved or deleted: balances and the Pot list may both have changed. */
+  protected onPotChanged(): void {
+    console.log('[MonthPage] pot changed');
+    this.potDialog().nativeElement.close();
+    this.summary.reload();
+    this.allPots.reload();
+  }
+
+  /** Esc fires `cancel` on a dialog; block it while a save is in flight. */
   protected onDialogCancel(event: Event): void {
     if (this.saving()) {
       console.log('[MonthPage] dialog close blocked while saving');

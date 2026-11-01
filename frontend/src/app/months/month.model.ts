@@ -27,6 +27,8 @@ export interface Entry {
   account: Account;
   startMonth: string;
   endMonth: string | null;
+  /** The Pot this Expense is a Contribution to. */
+  potId: number | null;
   createdAt: string;
 }
 
@@ -37,6 +39,8 @@ export interface UpdateEntryRequest {
   amount: number;
   account: Account;
   oneOff: boolean;
+  /** Makes an Expense a Contribution to this Pot; null for none. Always null on Income. */
+  potId: number | null;
 }
 
 /** Body of POST /api/entries. `startMonth` is the month being viewed. */
@@ -55,6 +59,8 @@ export interface MonthSummary {
   transfers: Transfer[];
   /** The month's Expenses totalled per category, largest first. Variants like "groceries " are merged. */
   expensesByCategory: CategoryTotal[];
+  /** Each Pot in use this month, with its end-of-month balance. */
+  pots: PotBalance[];
 }
 
 export interface CategoryTotal {
@@ -65,4 +71,64 @@ export interface CategoryTotal {
 export interface Transfer {
   account: Account;
   amount: number;
+}
+
+export type PotKind = 'SAVINGS' | 'LOAN' | 'OVERDRAFT' | 'CREDIT_CARD';
+
+export const POT_KINDS: readonly { value: PotKind; label: string }[] = [
+  { value: 'SAVINGS', label: 'Savings' },
+  { value: 'LOAN', label: 'Loan' },
+  { value: 'OVERDRAFT', label: 'Overdraft' },
+  { value: 'CREDIT_CARD', label: 'Credit card' },
+];
+
+export function potKindLabel(kind: PotKind): string {
+  return POT_KINDS.find((option) => option.value === kind)!.label;
+}
+
+/** A Debt Pot holds money owed; its balance is shown negative. */
+export function isDebt(kind: PotKind): boolean {
+  return kind !== 'SAVINGS';
+}
+
+/** Amounts are always positive, even for a debt. */
+export interface Pot {
+  id: number;
+  name: string;
+  kind: PotKind;
+  account: Account;
+  /** The balance at the end of `openingMonth`. */
+  openingBalance: number;
+  openingMonth: string;
+  /** Hidden from this month onwards; null while in use. */
+  archivedFrom: string | null;
+}
+
+/** Body of PUT /api/pots/{id}. The kind can't change after creation. */
+export interface UpdatePotRequest {
+  name: string;
+  account: Account;
+  openingBalance: number;
+  openingMonth: string;
+  archivedFrom: string | null;
+}
+
+/** Body of POST /api/pots. */
+export interface CreatePotRequest {
+  name: string;
+  kind: PotKind;
+  account: Account;
+  openingBalance: number;
+  openingMonth: string;
+}
+
+/** A Pot's balance at the end of one month: positive, even for a debt. */
+export interface PotBalance {
+  id: number;
+  name: string;
+  kind: PotKind;
+  account: Account;
+  balance: number;
+  /** True when this month has a Balance Check-in rather than a calculated balance. */
+  checkedIn: boolean;
 }

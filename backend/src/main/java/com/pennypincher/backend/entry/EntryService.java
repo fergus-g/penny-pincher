@@ -17,32 +17,52 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.pennypincher.backend.pot.PotService;
+
 @Service
 public class EntryService {
 
 	private final EntryRepository entryRepository;
 
-	public EntryService(EntryRepository entryRepository) {
+	private final PotService potService;
+
+	public EntryService(EntryRepository entryRepository, PotService potService) {
 		this.entryRepository = entryRepository;
+		this.potService = potService;
 	}
 
 	@Transactional
 	public EntryResponse create(CreateEntryRequest request) {
+		requireValidPot(request.type(), request.potId());
 		YearMonth endMonth = request.oneOff() ? request.startMonth() : null;
 		Entry entry = new Entry(request.type(), request.category(), request.name(), request.amount(),
 				request.account(), request.startMonth(), endMonth);
+		entry.setPotId(request.potId());
 		return EntryResponse.from(this.entryRepository.save(entry));
 	}
 
 	@Transactional
 	public EntryResponse update(Long id, UpdateEntryRequest request) {
 		Entry entry = findEntry(id);
+		requireValidPot(entry.getType(), request.potId());
 		entry.setCategory(request.category());
 		entry.setName(request.name());
 		entry.setAmount(request.amount());
 		entry.setAccount(request.account());
 		entry.setEndMonth(request.oneOff() ? entry.getStartMonth() : null);
+		entry.setPotId(request.potId());
 		return EntryResponse.from(entry);
+	}
+
+	/** Only an Expense can be a Contribution, and only to a Pot that exists. */
+	private void requireValidPot(EntryType type, Long potId) {
+		if (potId == null) {
+			return;
+		}
+		if (type != EntryType.EXPENSE) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only an Expense can pay into a Pot");
+		}
+		this.potService.requireExists(potId);
 	}
 
 	@Transactional
@@ -56,7 +76,8 @@ public class EntryService {
 		BigDecimal totalIncome = total(entries, EntryType.INCOME);
 		BigDecimal totalExpenses = total(entries, EntryType.EXPENSE);
 		return new MonthSummaryResponse(month, entries.stream().map(EntryResponse::from).toList(), totalIncome,
-				totalExpenses, totalIncome.subtract(totalExpenses), transfers(entries), expensesByCategory(entries));
+				totalExpenses, totalIncome.subtract(totalExpenses), transfers(entries), expensesByCategory(entries),
+				this.potService.balancesIn(month));
 	}
 
 	/** Every category used on this type of Entry, variants merged, in alphabetical order. */

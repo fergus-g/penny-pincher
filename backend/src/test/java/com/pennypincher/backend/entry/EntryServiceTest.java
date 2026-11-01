@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.pennypincher.backend.pot.PotService;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,7 +30,9 @@ class EntryServiceTest {
 
 	private final EntryRepository entryRepository = mock(EntryRepository.class);
 
-	private final EntryService entryService = new EntryService(this.entryRepository);
+	private final PotService potService = mock(PotService.class);
+
+	private final EntryService entryService = new EntryService(this.entryRepository, this.potService);
 
 	@Test
 	void createOneOffEndsInItsStartMonth() {
@@ -44,6 +48,35 @@ class EntryServiceTest {
 		EntryResponse response = this.entryService.create(createRequest(false));
 		assertThat(response.endMonth()).isNull();
 		assertThat(response.account()).isEqualTo(Account.REVOLUT);
+	}
+
+	@Test
+	void createExpenseCanPayIntoAnExistingPot() {
+		given(this.entryRepository.save(any(Entry.class))).willAnswer((invocation) -> invocation.getArgument(0));
+		EntryResponse response = this.entryService.create(new CreateEntryRequest(EntryType.EXPENSE, "Loans", null,
+				new BigDecimal("250.00"), Account.AIB, OCT, false, 7L));
+		verify(this.potService).requireExists(7L);
+		assertThat(response.potId()).isEqualTo(7L);
+	}
+
+	@Test
+	void incomeCannotPayIntoAPot() {
+		CreateEntryRequest request = new CreateEntryRequest(EntryType.INCOME, "Salary", null, BigDecimal.TEN,
+				Account.AIB, OCT, false, 7L);
+		assertThatThrownBy(() -> this.entryService.create(request)).isInstanceOfSatisfying(
+				ResponseStatusException.class,
+				(ex) -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+		verify(this.entryRepository, never()).save(any(Entry.class));
+	}
+
+	@Test
+	void updateCanUnlinkAContribution() {
+		Entry entry = entry(EntryType.EXPENSE, "250.00");
+		entry.setPotId(7L);
+		given(this.entryRepository.findById(1L)).willReturn(Optional.of(entry));
+		EntryResponse response = this.entryService.update(1L,
+				new UpdateEntryRequest("Loans", null, new BigDecimal("250.00"), Account.AIB, false, null));
+		assertThat(response.potId()).isNull();
 	}
 
 	@Test
@@ -108,7 +141,7 @@ class EntryServiceTest {
 		Entry entry = entry(EntryType.EXPENSE, "1000.00");
 		given(this.entryRepository.findById(1L)).willReturn(Optional.of(entry));
 		EntryResponse response = this.entryService.update(1L,
-				new UpdateEntryRequest("Housing", "Rent", new BigDecimal("1100.00"), Account.REVOLUT, true));
+				new UpdateEntryRequest("Housing", "Rent", new BigDecimal("1100.00"), Account.REVOLUT, true, null));
 		assertThat(response.type()).isEqualTo(EntryType.EXPENSE);
 		assertThat(response.category()).isEqualTo("Housing");
 		assertThat(response.name()).isEqualTo("Rent");
@@ -122,14 +155,14 @@ class EntryServiceTest {
 		Entry entry = new Entry(EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), Account.AIB, OCT, OCT);
 		given(this.entryRepository.findById(1L)).willReturn(Optional.of(entry));
 		EntryResponse response = this.entryService.update(1L,
-				new UpdateEntryRequest("Tech", "Laptop", new BigDecimal("300.50"), Account.AIB, false));
+				new UpdateEntryRequest("Tech", "Laptop", new BigDecimal("300.50"), Account.AIB, false, null));
 		assertThat(response.endMonth()).isNull();
 	}
 
 	@Test
 	void updateMissingEntryThrowsNotFound() {
 		given(this.entryRepository.findById(99L)).willReturn(Optional.empty());
-		UpdateEntryRequest request = new UpdateEntryRequest("X", null, BigDecimal.ONE, Account.AIB, false);
+		UpdateEntryRequest request = new UpdateEntryRequest("X", null, BigDecimal.ONE, Account.AIB, false, null);
 		assertThatThrownBy(() -> this.entryService.update(99L, request)).isInstanceOfSatisfying(
 				ResponseStatusException.class, (ex) -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
 	}
@@ -182,7 +215,7 @@ class EntryServiceTest {
 
 	private static CreateEntryRequest createRequest(boolean oneOff) {
 		return new CreateEntryRequest(EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), Account.REVOLUT,
-				OCT, oneOff);
+				OCT, oneOff, null);
 	}
 
 	private static Entry entry(EntryType type, String amount) {
