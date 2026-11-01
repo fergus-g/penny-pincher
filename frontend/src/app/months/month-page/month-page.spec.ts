@@ -49,6 +49,13 @@ class FakeMonthApi {
     this.months[request.startMonth] = [...(this.months[request.startMonth] ?? []), created];
     return of(created);
   }
+
+  deleteEntry(id: number): Observable<void> {
+    for (const month of Object.keys(this.months)) {
+      this.months[month] = this.months[month].filter((e) => e.id !== id);
+    }
+    return of(undefined);
+  }
 }
 
 async function render(api: FakeMonthApi, month = '2026-11') {
@@ -77,10 +84,7 @@ async function addEntry(
   title: string,
   values: { category: string; name: string; amount: string },
 ) {
-  page
-    .section(title)
-    .querySelector<HTMLButtonElement>(`button[aria-label="Add ${title}"]`)!
-    .click();
+  page.section(title).querySelector<HTMLButtonElement>('.add-button')!.click();
   await page.fixture.whenStable();
   const form = page.el.querySelector('dialog form') as HTMLFormElement;
   for (const [field, value] of Object.entries(values)) {
@@ -169,7 +173,7 @@ describe('MonthPage sections', () => {
 
     expect(section('Income').textContent).toContain('No income this month');
     expect(toggle('Income')).toBeNull();
-    expect(section('Income').querySelector('button[aria-label="Add Income"]')).not.toBeNull();
+    expect(section('Income').querySelector('.add-button')).not.toBeNull();
   });
 
   it('stay open when moving to another month', async () => {
@@ -234,5 +238,26 @@ describe('MonthPage sections', () => {
     await page.fixture.whenStable();
 
     expect(page.rows('Expenses').filter((row) => row.classList.contains('flash'))).toHaveLength(0);
+  });
+
+  it('delete an Entry from its edit dialog only after confirming', async () => {
+    const page = await render(api);
+    page.toggle('Expenses')!.click();
+    await page.fixture.whenStable();
+    page.rows('Expenses')[0].click();
+    await page.fixture.whenStable();
+    const deleteButton = () => page.el.querySelector<HTMLButtonElement>('dialog button.delete')!;
+
+    deleteButton().click();
+    await page.fixture.whenStable();
+    expect(deleteButton().textContent).toContain('Confirm delete');
+    expect(api.months['2026-11'].map((e) => e.id)).toContain(2);
+
+    deleteButton().click();
+    await page.fixture.whenStable();
+    expect(api.months['2026-11'].map((e) => e.id)).not.toContain(2);
+    expect(page.rows('Expenses').map((row) => row.textContent)).toEqual([
+      expect.stringContaining('Groceries'),
+    ]);
   });
 });
