@@ -1,7 +1,9 @@
 import { CurrencyPipe } from '@angular/common';
 import {
+  afterRenderEffect,
   Component,
   computed,
+  DestroyRef,
   ElementRef,
   inject,
   input,
@@ -14,7 +16,7 @@ import { Router } from '@angular/router';
 
 import { EntryForm } from '../entry-form/entry-form';
 import { MonthApi } from '../month-api';
-import { Entry, EntryType } from '../month.model';
+import { Entry, EntryType, MonthSummary } from '../month.model';
 
 /** The current month as "yyyy-MM". */
 export function currentMonth(): string {
@@ -35,6 +37,12 @@ function shiftMonth(month: string, delta: number): string {
   date.setMonth(date.getMonth() + delta);
   return formatMonth(date);
 }
+
+/** Per-section wording and which month total it shows. */
+const SECTION = {
+  INCOME: { title: 'Income', empty: 'No income this month', total: 'totalIncome' },
+  EXPENSE: { title: 'Expenses', empty: 'No expenses this month', total: 'totalExpenses' },
+} as const satisfies Record<EntryType, { title: string; empty: string; total: keyof MonthSummary }>;
 
 @Component({
   imports: [CurrencyPipe, EntryForm],
@@ -59,14 +67,26 @@ export class MonthPage {
     stream: ({ params }) => this.monthApi.getMonth(params),
   });
 
-  private readonly entries = computed(() => (this.summary.hasValue() ? this.summary.value().entries : []));
-  protected readonly columns = computed(() =>
-    (['INCOME', 'EXPENSE'] as const).map((type) => ({
-      type,
-      title: type === 'INCOME' ? 'Income' : 'Expense',
-      entries: this.entries().filter((entry) => entry.type === type),
-    })),
+  private readonly entries = computed(() =>
+    this.summary.hasValue() ? this.summary.value().entries : [],
   );
+  /** Which sections are open. Page-level, so it survives month changes but not a reload. */
+  protected readonly open = signal<Record<EntryType, boolean>>({ INCOME: false, EXPENSE: false });
+
+  protected readonly sections = computed(() => {
+    const month = this.summary.hasValue() ? this.summary.value() : null;
+    return (['INCOME', 'EXPENSE'] as const).map((type) => {
+      const entries = this.entries().filter((entry) => entry.type === type);
+      return {
+        type,
+        ...SECTION[type],
+        entries,
+        count: `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}`,
+        total: month?.[SECTION[type].total] ?? 0,
+        open: this.open()[type],
+      };
+    });
+  });
 
   private readonly dialog = viewChild.required<ElementRef<HTMLDialogElement>>('dialog');
   /** What the dialog's form is for; null while the dialog is closed. */
@@ -78,6 +98,43 @@ export class MonthPage {
     source: this.month,
     computation: () => null,
   });
+
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  /** A just-added Entry waiting to be scrolled to and flashed once its row renders. */
+  private readonly pendingReveal = signal<number | null>(null);
+  /** Waits for a revealed row to be on screen; one at a time. */
+  private revealObserver: IntersectionObserver | null = null;
+  /** The Entry whose row is flashing right now. */
+  protected readonly flashingId = signal<number | null>(null);
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.revealObserver?.disconnect());
+
+    // Runs after each render: once the new Entry's row exists, reveal it.
+    afterRenderEffect(() => {
+      const id = this.pendingReveal();
+      if (id === null || !this.summary.hasValue()) {
+        return;
+      }
+      const row = this.host.nativeElement.querySelector<HTMLElement>(`[data-entry-id="${id}"]`);
+      if (row) {
+        this.pendingReveal.set(null);
+        this.reveal(row, id);
+      }
+    });
+  }
+
+  protected toggle(type: EntryType): void {
+    this.setOpen(type, !this.open()[type]);
+  }
+
+  private setOpen(type: EntryType, open: boolean): void {
+    this.open.update((sections) => ({ ...sections, [type]: open }));
+    if (!open) {
+      // A collapsed row never fires animationend, so drop any flash rather than replay it later.
+      this.endFlash();
+    }
+  }
 
   protected openAdd(type: EntryType): void {
     console.log('[MonthPage] add clicked', type);
@@ -91,10 +148,36 @@ export class MonthPage {
     this.dialog().nativeElement.showModal();
   }
 
-  protected onSaved(): void {
-    console.log('[MonthPage] entry saved');
+  protected onSaved(saved: Entry): void {
+    const added = this.editing()?.entry === null;
+    console.log('[MonthPage] entry saved', saved.id, added ? '(added)' : '(edited)');
     this.dialog().nativeElement.close();
+    if (added) {
+      this.setOpen(saved.type, true);
+      this.pendingReveal.set(saved.id);
+    }
     this.summary.reload();
+  }
+
+  /** Scrolls the row into view if it's off-screen, then flashes it once it's visible. */
+  private reveal(row: HTMLElement, id: number): void {
+    const { top, bottom } = row.getBoundingClientRect();
+    if (top < 0 || bottom > window.innerHeight) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    this.revealObserver?.disconnect();
+    this.revealObserver = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        this.revealObserver?.disconnect();
+        this.revealObserver = null;
+        this.flashingId.set(id);
+      }
+    });
+    this.revealObserver.observe(row);
+  }
+
+  protected endFlash(): void {
+    this.flashingId.set(null);
   }
 
   protected remove(entry: Entry): void {

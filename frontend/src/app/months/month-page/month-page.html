@@ -20,7 +20,9 @@
     </div>
     <div>
       <span>Remainder</span>
-      <strong [class.negative]="month.remainder < 0">{{ month.remainder | currency: 'EUR' }}</strong>
+      <strong [class.negative]="month.remainder < 0">{{
+        month.remainder | currency: 'EUR'
+      }}</strong>
     </div>
   </section>
 
@@ -28,33 +30,65 @@
     <p class="message error">{{ deleteError }}</p>
   }
 
-  <section class="columns">
-    @for (column of columns(); track column.type) {
-      <div>
-        <div class="column-header">
-          <h2>{{ column.title }}</h2>
-          <button type="button" (click)="openAdd(column.type)" [attr.aria-label]="'Add ' + column.title">
+  <div class="sections">
+    @for (section of sections(); track section.type) {
+      <section class="entries">
+        <div class="section-header">
+          <h2>
+            @if (section.entries.length === 0) {
+              <span class="title">{{ section.title }}</span>
+              <span class="summary">{{ section.empty }}</span>
+            } @else {
+              <button
+                type="button"
+                class="section-toggle"
+                [attr.aria-expanded]="section.open"
+                [attr.aria-controls]="'entries-' + section.type"
+                (click)="toggle(section.type)"
+              >
+                <span class="chevron" aria-hidden="true">{{ section.open ? '▾' : '▸' }}</span>
+                <span class="title">{{ section.title }}</span>
+                <span class="summary"
+                  >{{ section.count }} · {{ section.total | currency: 'EUR' }}</span
+                >
+              </button>
+            }
+          </h2>
+          <button
+            type="button"
+            (click)="openAdd(section.type)"
+            [attr.aria-label]="'Add ' + section.title"
+          >
             +
           </button>
         </div>
-        @for (entry of column.entries; track entry.id) {
-          <div class="entry">
-            <div>
-              <div>{{ entryLabel(entry) }}</div>
-              <small>{{ entry.category }} · {{ kind(entry) }}</small>
-            </div>
-            <div class="entry-end">
-              <span class="amount">{{ entry.amount | currency: 'EUR' }}</span>
-              <button type="button" (click)="openEdit(entry)">Edit</button>
-              <button type="button" (click)="remove(entry)">Delete</button>
-            </div>
-          </div>
-        } @empty {
-          <p class="message">None</p>
-        }
-      </div>
+        <!-- Always present so the toggle's aria-controls has a target; rows only when open. -->
+        <div [id]="'entries-' + section.type">
+          @if (section.open) {
+            @for (entry of section.entries; track entry.id) {
+              <div
+                class="entry"
+                [attr.data-entry-id]="entry.id"
+                [class.flash]="entry.id === flashingId()"
+                [class.income]="section.type === 'INCOME'"
+                (animationend)="endFlash()"
+              >
+                <div>
+                  <div>{{ entryLabel(entry) }}</div>
+                  <small>{{ entry.category }} · {{ kind(entry) }}</small>
+                </div>
+                <div class="entry-end">
+                  <span class="amount">{{ entry.amount | currency: 'EUR' }}</span>
+                  <button type="button" (click)="openEdit(entry)">Edit</button>
+                  <button type="button" (click)="remove(entry)">Delete</button>
+                </div>
+              </div>
+            }
+          }
+        </div>
+      </section>
     }
-  </section>
+  </div>
 } @else {
   <p class="message">Loading…</p>
 }
@@ -66,7 +100,7 @@
       [entry]="editing.entry"
       [month]="month()"
       [(saving)]="saving"
-      (saved)="onSaved()"
+      (saved)="onSaved($event)"
       (cancelled)="dialog.close()"
     />
   }

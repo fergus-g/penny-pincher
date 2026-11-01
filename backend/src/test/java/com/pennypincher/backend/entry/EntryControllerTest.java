@@ -79,6 +79,22 @@ class EntryControllerTest {
 	}
 
 	@Test
+	void updateWithoutTypeReturns200WithEntry() {
+		given(this.entryService.update(eq(1L), any(UpdateEntryRequest.class))).willReturn(laptop());
+		assertThat(this.mvc.put()
+			.uri("/api/entries/1")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{"category":"Tech","name":"Laptop","amount":300.50,"oneOff":true}
+					"""))
+			.hasStatus(HttpStatus.OK)
+			.bodyJson()
+			.isLenientlyEqualTo("""
+					{"id":1,"type":"EXPENSE","name":"Laptop"}
+					""");
+	}
+
+	@Test
 	void updateMissingEntryReturns404() {
 		given(this.entryService.update(eq(99L), any(UpdateEntryRequest.class)))
 			.willThrow(new ResponseStatusException(HttpStatus.NOT_FOUND, "Entry 99 not found"));
@@ -86,7 +102,7 @@ class EntryControllerTest {
 			.uri("/api/entries/99")
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"type":"EXPENSE","category":"Tech","amount":1}
+					{"category":"Tech","amount":1}
 					"""))
 			.hasStatus(HttpStatus.NOT_FOUND)
 			.bodyJson()

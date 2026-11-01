@@ -31,7 +31,8 @@ export class EntryForm implements OnInit {
   readonly month = input.required<string>();
   readonly entry = input<Entry | null>(null);
 
-  readonly saved = output<void>();
+  /** The Entry as the backend saved it. */
+  readonly saved = output<Entry>();
   readonly cancelled = output<void>();
 
   protected readonly title = computed(
@@ -75,7 +76,6 @@ export class EntryForm implements OnInit {
     }
     const { category, name, amount, oneOff } = this.form.getRawValue();
     const body: UpdateEntryRequest = {
-      type: this.type(),
       category: category.trim(),
       name: name.trim() || null,
       amount: amount!,
@@ -84,14 +84,14 @@ export class EntryForm implements OnInit {
     const entry = this.entry();
     const request = entry
       ? this.monthApi.updateEntry(entry.id, body)
-      : this.monthApi.createEntry({ ...body, startMonth: this.month() });
+      : this.monthApi.createEntry({ ...body, type: this.type(), startMonth: this.month() });
 
     this.saving.set(true);
     this.error.set(null);
     request.subscribe({
-      next: () => {
+      next: (saved) => {
         this.saving.set(false);
-        this.saved.emit();
+        this.saved.emit(saved);
       },
       error: (error: HttpErrorResponse) => {
         this.saving.set(false);
