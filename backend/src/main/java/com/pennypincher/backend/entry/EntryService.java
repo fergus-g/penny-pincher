@@ -34,6 +34,7 @@ public class EntryService {
 
 	@Transactional
 	public EntryResponse create(CreateEntryRequest request) {
+		requireValidAccount(request.type(), request.account());
 		requireValidPot(request.type(), request.potId());
 		YearMonth endMonth = request.oneOff() ? request.startMonth() : null;
 		Entry entry = new Entry(request.type(), request.category(), request.name(), request.amount(),
@@ -45,6 +46,7 @@ public class EntryService {
 	@Transactional
 	public EntryResponse update(Long id, UpdateEntryRequest request) {
 		Entry entry = findEntry(id);
+		requireValidAccount(entry.getType(), request.account());
 		requireValidPot(entry.getType(), request.potId());
 		entry.setCategory(request.category());
 		entry.setName(request.name());
@@ -53,6 +55,16 @@ public class EntryService {
 		entry.setEndMonth(request.oneOff() ? entry.getStartMonth() : null);
 		entry.setPotId(request.potId());
 		return EntryResponse.from(entry);
+	}
+
+	/** An Expense is paid out of an Account; Income lands outside the app, so it has none. */
+	private static void requireValidAccount(EntryType type, Account account) {
+		if (type == EntryType.EXPENSE && account == null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "An Expense needs an Account");
+		}
+		if (type == EntryType.INCOME && account != null) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Income has no Account");
+		}
 	}
 
 	/** Only an Expense can be a Contribution, and only to a Pot that exists. */
@@ -78,7 +90,7 @@ public class EntryService {
 		BigDecimal totalExpenses = total(entries, EntryType.EXPENSE);
 		PotMonth pots = this.potService.monthOf(month);
 		return new MonthSummaryResponse(month, entries.stream().map(EntryResponse::from).toList(), totalIncome,
-				totalExpenses, totalIncome.subtract(totalExpenses), transfers(entries, pots.allocationMoves()),
+				totalExpenses, totalIncome.subtract(totalExpenses), transfers(entries),
 				expensesByCategory(entries), pots.pots(), pots.allocation());
 	}
 
@@ -125,16 +137,13 @@ public class EntryService {
 			.getKey();
 	}
 
-	/**
-	 * One Transfer per non-home Account: its Expenses minus its Income, plus whatever the
-	 * Allocation sends there (Savings, Allowance, Debt Repayment). Zero when it balances.
-	 */
-	private static List<Transfer> transfers(List<Entry> entries, Map<Account, BigDecimal> allocationMoves) {
-		return Arrays.stream(Account.values()).filter((account) -> account != Account.HOME).map((account) -> {
-			List<Entry> onAccount = entries.stream().filter((entry) -> entry.getAccount() == account).toList();
-			return new Transfer(account, total(onAccount, EntryType.EXPENSE).subtract(total(onAccount, EntryType.INCOME))
-				.add(allocationMoves.getOrDefault(account, BigDecimal.ZERO)));
-		}).toList();
+	/** One Transfer per Account, always: the total of the Expenses paid out of it this month. */
+	private static List<Transfer> transfers(List<Entry> entries) {
+		return Arrays.stream(Account.values())
+			.map((account) -> new Transfer(account,
+					total(entries.stream().filter((entry) -> entry.getAccount() == account).toList(),
+							EntryType.EXPENSE)))
+			.toList();
 	}
 
 	private Entry findEntry(Long id) {

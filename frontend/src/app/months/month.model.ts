@@ -3,11 +3,14 @@
 
 export type EntryType = 'INCOME' | 'EXPENSE';
 
-/** The bank account an Entry is paid out of or lands in. */
+/**
+ * A joint bank account that Expenses are paid out of and that needs money put into it each month.
+ * Income lands in sole accounts the app doesn't track, so it has none (ADR 0002).
+ */
 export type Account = 'AIB' | 'REVOLUT';
 
-/** Income lands here; Transfers move money from it to the other Accounts. */
-export const HOME_ACCOUNT: Account = 'AIB';
+/** Where forms start, and the Account an Expense row leaves unsaid because most are on it. */
+export const DEFAULT_ACCOUNT: Account = 'AIB';
 
 export const ACCOUNTS: readonly { value: Account; label: string }[] = [
   { value: 'AIB', label: 'AIB' },
@@ -24,7 +27,8 @@ export interface Entry {
   category: string;
   name: string | null;
   amount: number;
-  account: Account;
+  /** The Account an Expense is paid out of; null for Income. */
+  account: Account | null;
   startMonth: string;
   endMonth: string | null;
   /** The Pot this Expense is a Contribution to. */
@@ -37,7 +41,8 @@ export interface UpdateEntryRequest {
   category: string;
   name: string | null;
   amount: number;
-  account: Account;
+  /** Required for an Expense; must be null for Income. */
+  account: Account | null;
   oneOff: boolean;
   /** Makes an Expense a Contribution to this Pot; null for none. Always null on Income. */
   potId: number | null;
@@ -55,7 +60,7 @@ export interface MonthSummary {
   totalIncome: number;
   totalExpenses: number;
   remainder: number;
-  /** One per non-home Account: what to move into it this month. Negative means move it back home. */
+  /** One per Account, always: what to put into it this month. */
   transfers: Transfer[];
   /** The month's Expenses totalled per category, largest first. Variants like "groceries " are merged. */
   expensesByCategory: CategoryTotal[];
@@ -141,7 +146,6 @@ export interface AllocationSummary {
   effectiveFrom: string;
   savings: number;
   allowance: number;
-  allowanceAccount: Account;
   /** Whatever is left after Savings and Allowance; never below zero. */
   debtRepayment: number;
   /** Savings plus Allowance exceed the Remainder; neither is reduced. */
@@ -160,7 +164,6 @@ export interface AllocationSummary {
 export interface AllocationRequest {
   savings: number;
   allowance: number;
-  allowanceAccount: Account;
   savingsPotId: number | null;
   debtPotId: number | null;
 }

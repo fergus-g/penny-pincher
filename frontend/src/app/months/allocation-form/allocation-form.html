@@ -75,27 +75,14 @@
         }
       </div>
       <div class="field">
-        <label for="allocation-allowance-account">Into account</label>
-        <select
-          id="allocation-allowance-account"
-          class="text-input"
-          formControlName="allowanceAccount"
-        >
-          @for (account of accounts; track account.value) {
-            <option [value]="account.value">{{ account.label }}</option>
+        <label for="allocation-debt-pot">Debt Repayment pays down</label>
+        <select id="allocation-debt-pot" class="text-input" formControlName="debtPotId">
+          <option [ngValue]="null">Not assigned</option>
+          @for (pot of debtPots(); track pot.id) {
+            <option [ngValue]="pot.id">{{ pot.name }}</option>
           }
         </select>
       </div>
-    </div>
-
-    <div class="field">
-      <label for="allocation-debt-pot">Debt Repayment pays down</label>
-      <select id="allocation-debt-pot" class="text-input" formControlName="debtPotId">
-        <option [ngValue]="null">Not assigned</option>
-        @for (pot of debtPots(); track pot.id) {
-          <option [ngValue]="pot.id">{{ pot.name }}</option>
-        }
-      </select>
     </div>
 
     <div class="note" role="note">

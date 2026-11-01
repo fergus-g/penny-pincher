@@ -48,7 +48,7 @@ class PotRepositoryTest {
 
 	@Test
 	void incomeCannotPayIntoAPot() {
-		Entry salary = new Entry(EntryType.INCOME, "Salary", null, BigDecimal.TEN, Account.AIB, MAR, null);
+		Entry salary = new Entry(EntryType.INCOME, "Salary", null, BigDecimal.TEN, null, MAR, null);
 		salary.setPotId(savePot());
 		assertThatThrownBy(() -> this.entryRepository.saveAndFlush(salary))
 			.isInstanceOf(DataIntegrityViolationException.class);

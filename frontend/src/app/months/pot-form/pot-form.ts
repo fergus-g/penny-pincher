@@ -9,7 +9,7 @@ import { monthLabel } from '../month-label';
 import {
   Account,
   ACCOUNTS,
-  HOME_ACCOUNT,
+  DEFAULT_ACCOUNT,
   Pot,
   PotKind,
   POT_KINDS,
@@ -51,7 +51,7 @@ export class PotForm implements OnInit {
       validators: [Validators.required, Validators.pattern(/\S/), Validators.maxLength(50)],
     }),
     kind: new FormControl<PotKind>('SAVINGS', { nonNullable: true }),
-    account: new FormControl<Account>(HOME_ACCOUNT, { nonNullable: true }),
+    account: new FormControl<Account>(DEFAULT_ACCOUNT, { nonNullable: true }),
     openingBalance: new FormControl<number | null>(null, [
       Validators.required,
       Validators.min(0),

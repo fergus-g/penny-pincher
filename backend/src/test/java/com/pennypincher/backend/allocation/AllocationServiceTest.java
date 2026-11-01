@@ -81,8 +81,7 @@ class AllocationServiceTest {
 	}
 
 	private static AllocationRequest request(Long savingsPotId, Long debtPotId) {
-		return new AllocationRequest(new BigDecimal("400.00"), new BigDecimal("200.00"), Account.REVOLUT,
-				savingsPotId, debtPotId);
+		return new AllocationRequest(new BigDecimal("400.00"), new BigDecimal("200.00"), savingsPotId, debtPotId);
 	}
 
 	private static Pot pot(PotKind kind) {

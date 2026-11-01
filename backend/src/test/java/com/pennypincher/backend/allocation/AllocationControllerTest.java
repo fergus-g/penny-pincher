@@ -12,8 +12,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 
-import com.pennypincher.backend.entry.Account;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -37,12 +35,12 @@ class AllocationControllerTest {
 	@Test
 	void putSavesTheAllocationFromThatMonth() {
 		given(this.allocationService.save(eq(MAR), any(AllocationRequest.class))).willReturn(new AllocationResponse(
-				1L, MAR, new BigDecimal("400.00"), new BigDecimal("200.00"), Account.REVOLUT, 2L, null));
+				1L, MAR, new BigDecimal("400.00"), new BigDecimal("200.00"), 2L, null));
 		assertThat(this.mvc.put()
 			.uri("/api/months/2026-03/allocation")
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"savings":400,"allowance":200,"allowanceAccount":"REVOLUT","savingsPotId":2}
+					{"savings":400,"allowance":200,"savingsPotId":2}
 					""")).hasStatusOk().bodyJson().isLenientlyEqualTo("""
 				{"effectiveFrom":"2026-03","savings":400.00,"savingsPotId":2,"debtPotId":null}
 				""");
@@ -54,7 +52,7 @@ class AllocationControllerTest {
 			.uri("/api/months/2026-03/allocation")
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
-					{"savings":-1,"allowance":200,"allowanceAccount":"AIB"}
+					{"savings":-1,"allowance":200}
 					""")).hasStatus(HttpStatus.BAD_REQUEST).bodyJson().isLenientlyEqualTo("""
 				{"errors":{"savings":"must be greater than or equal to 0"}}
 				""");

@@ -18,7 +18,7 @@ public record UpdateEntryRequest(
 		@NotBlank @Size(max = 50) String category,
 		@Size(max = 100) String name,
 		@NotNull @Positive @Digits(integer = 10, fraction = 2) BigDecimal amount,
-		@NotNull Account account,
+		Account account,
 		boolean oneOff,
 		Long potId) {
 }

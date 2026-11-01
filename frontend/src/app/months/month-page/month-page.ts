@@ -23,7 +23,7 @@ import {
   accountLabel,
   Entry,
   EntryType,
-  HOME_ACCOUNT,
+  DEFAULT_ACCOUNT,
   isDebt,
   MonthSummary,
   Pot,
@@ -127,15 +127,7 @@ export class MonthPage {
     }
     return this.summary
       .value()
-      .transfers.filter((transfer) => transfer.amount !== 0)
-      .map((transfer) => ({
-        account: transfer.account,
-        amount: Math.abs(transfer.amount),
-        text:
-          transfer.amount > 0
-            ? { verb: 'Transfer', to: `to ${accountLabel(transfer.account)}` }
-            : { verb: 'Move', to: `back to ${accountLabel(HOME_ACCOUNT)}` },
-      }));
+      .transfers.map((transfer) => ({ ...transfer, label: accountLabel(transfer.account) }));
   });
 
   /** Each type's categories this month, most recently added first: quick picks when adding. */
@@ -176,7 +168,6 @@ export class MonthPage {
     }
     return {
       ...split,
-      allowanceAccountLabel: accountLabel(split.allowanceAccount),
       /** How far Savings plus Allowance overshoot the Remainder. */
       shortfallBy: split.savings + split.allowance - month.remainder,
       paidOffLabel: split.debtPaidOffIn ? monthLabel(split.debtPaidOffIn) : null,
@@ -367,7 +358,10 @@ export class MonthPage {
   protected entryMeta(entry: Entry): string {
     const pot = this.potList().find((candidate) => candidate.id === entry.potId);
     return (
-      [entry.category, entry.account === HOME_ACCOUNT ? null : accountLabel(entry.account)]
+      [
+        entry.category,
+        entry.account && entry.account !== DEFAULT_ACCOUNT ? accountLabel(entry.account) : null,
+      ]
         .filter((part) => part !== null)
         .join(' · ') + (pot ? ` → ${pot.name}` : '')
     );

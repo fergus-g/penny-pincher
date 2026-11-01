@@ -89,6 +89,7 @@
     </section>
 
     @if (transfers().length > 0) {
+      <!-- Always one line per Account, even at €0, so it reads the same every month. -->
       <section class="card transfers" aria-labelledby="transfers-title">
         <h2 id="transfers-title">Transfers</h2>
         <ul>
@@ -108,9 +109,8 @@
                 <path d="M5 12h14M13 6l6 6-6 6" />
               </svg>
               <span
-                >{{ transfer.text.verb }}
-                <strong>{{ transfer.amount | currency: 'EUR' }}</strong>
-                {{ transfer.text.to }}</span
+                >Put <strong>{{ transfer.amount | currency: 'EUR' }}</strong> into
+                {{ transfer.label }}</span
               >
             </li>
           }
@@ -155,7 +155,7 @@
             <dt>Allowance</dt>
             <dd>
               <strong>{{ split.allowance | currency: 'EUR' }}</strong>
-              <span class="target">{{ split.allowanceAccountLabel }}</span>
+              <span class="target">Spending money</span>
             </dd>
           </div>
           <div>

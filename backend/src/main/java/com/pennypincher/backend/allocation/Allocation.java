@@ -6,14 +6,11 @@ import java.time.YearMonth;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-import com.pennypincher.backend.entry.Account;
 import com.pennypincher.backend.entry.YearMonthConverter;
 
 /**
@@ -37,10 +34,6 @@ public class Allocation {
 
 	@Column(nullable = false, precision = 12, scale = 2)
 	private BigDecimal allowance;
-
-	@Enumerated(EnumType.STRING)
-	@Column(name = "allowance_account", nullable = false, length = 20)
-	private Account allowanceAccount;
 
 	/** Where Savings go; null leaves them unassigned. */
 	@Column(name = "savings_pot_id")
@@ -79,14 +72,6 @@ public class Allocation {
 
 	public void setAllowance(BigDecimal allowance) {
 		this.allowance = allowance;
-	}
-
-	public Account getAllowanceAccount() {
-		return this.allowanceAccount;
-	}
-
-	public void setAllowanceAccount(Account allowanceAccount) {
-		this.allowanceAccount = allowanceAccount;
 	}
 
 	public Long getSavingsPotId() {
