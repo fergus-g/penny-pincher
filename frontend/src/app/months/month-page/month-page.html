@@ -1,0 +1,60 @@
+<header class="month-nav">
+  <button type="button" (click)="previous()">‹ Previous</button>
+  <h1>{{ label() }}</h1>
+  <button type="button" (click)="next()">Next ›</button>
+</header>
+
+@if (summary.error()) {
+  <p class="message error">Couldn't load {{ label() }}. Is the backend running?</p>
+} @else if (summary.hasValue()) {
+  @let month = summary.value();
+
+  <section class="totals">
+    <div>
+      <span>Income</span>
+      <strong>{{ month.totalIncome | currency: 'EUR' }}</strong>
+    </div>
+    <div>
+      <span>Expenses</span>
+      <strong>{{ -month.totalExpenses | currency: 'EUR' }}</strong>
+    </div>
+    <div>
+      <span>Remainder</span>
+      <strong [class.negative]="month.remainder < 0">{{ month.remainder | currency: 'EUR' }}</strong>
+    </div>
+  </section>
+
+  <section class="columns">
+    <div>
+      <h2>Income</h2>
+      @for (entry of incomes(); track entry.id) {
+        <div class="entry">
+          <div>
+            <div>{{ entry.name ?? entry.category }}</div>
+            <small>{{ entry.category }} · {{ kind(entry) }}</small>
+          </div>
+          <div class="amount">{{ entry.amount | currency: 'EUR' }}</div>
+        </div>
+      } @empty {
+        <p class="message">None</p>
+      }
+    </div>
+
+    <div>
+      <h2>Expense</h2>
+      @for (entry of expenses(); track entry.id) {
+        <div class="entry">
+          <div>
+            <div>{{ entry.name ?? entry.category }}</div>
+            <small>{{ entry.category }} · {{ kind(entry) }}</small>
+          </div>
+          <div class="amount">{{ entry.amount | currency: 'EUR' }}</div>
+        </div>
+      } @empty {
+        <p class="message">None</p>
+      }
+    </div>
+  </section>
+} @else {
+  <p class="message">Loading…</p>
+}
