@@ -83,6 +83,17 @@ class MonthLedgerTest {
 		assertThat(balance(rainyDay, APR)).isEqualByComparingTo("1350.00");
 	}
 
+	@Test
+	void aWeeklyRateContributionPaysItsMonthsAmount() {
+		Pot card = pot(1L, PotKind.CREDIT_CARD, "2000.00", YearMonth.of(2026, 10), Account.AIB);
+		Entry repayment = new Entry(EntryType.EXPENSE, "Pots", null, null, Account.AIB, YearMonth.of(2026, 10), null);
+		repayment.setWeeklyRate(new BigDecimal("100.00"));
+		repayment.setPotId(card.getId());
+		this.entries.add(repayment);
+		assertThat(balance(card, YearMonth.of(2026, 11))).isEqualByComparingTo("1600.00");
+		assertThat(balance(card, YearMonth.of(2026, 12))).isEqualByComparingTo("1100.00");
+	}
+
 	// Allocation (slice 4)
 
 	@Test

@@ -35,8 +35,13 @@ public class Entry {
 	@Column(length = 100)
 	private String name;
 
-	@Column(nullable = false, precision = 12, scale = 2)
+	/** The amount every month; null when the Entry has a Weekly Rate instead. */
+	@Column(precision = 12, scale = 2)
 	private BigDecimal amount;
+
+	/** An Expense's price per payday week; null for a monthly amount, and always for Income. */
+	@Column(name = "weekly_rate", precision = 12, scale = 2)
+	private BigDecimal weeklyRate;
 
 	/** The Account an Expense is paid out of; null for Income. */
 	@Enumerated(EnumType.STRING)
@@ -91,6 +96,12 @@ public class Entry {
 		return (this.dueDay != null) ? Math.min(this.dueDay, month.lengthOfMonth()) : null;
 	}
 
+	/** What this Entry costs or brings in during {@code month}: a Weekly Rate times its payday weeks. */
+	public BigDecimal amountIn(YearMonth month) {
+		return (this.weeklyRate != null) ? this.weeklyRate.multiply(BigDecimal.valueOf(Payday.weeksIn(month)))
+				: this.amount;
+	}
+
 	public Long getId() {
 		return this.id;
 	}
@@ -121,6 +132,14 @@ public class Entry {
 
 	public void setAmount(BigDecimal amount) {
 		this.amount = amount;
+	}
+
+	public BigDecimal getWeeklyRate() {
+		return this.weeklyRate;
+	}
+
+	public void setWeeklyRate(BigDecimal weeklyRate) {
+		this.weeklyRate = weeklyRate;
 	}
 
 	public Account getAccount() {

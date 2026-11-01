@@ -26,7 +26,12 @@ export interface Entry {
   type: EntryType;
   category: string;
   name: string | null;
+  /** What the Entry comes to in the month returned; for a Weekly Rate, `weeklyRate × weeks`. */
   amount: number;
+  /** An Expense's price per payday week; null for a monthly amount. */
+  weeklyRate: number | null;
+  /** The month's payday weeks (4 or 5) when there's a Weekly Rate; null otherwise. */
+  weeks: number | null;
   /** The Account an Expense is paid out of; null for Income. */
   account: Account | null;
   startMonth: string;
@@ -44,7 +49,10 @@ export interface Entry {
 export interface UpdateEntryRequest {
   category: string;
   name: string | null;
-  amount: number;
+  /** The monthly amount; null when `weeklyRate` is given instead. */
+  amount: number | null;
+  /** An Expense's price per payday week; null for a monthly amount. Always null on Income. */
+  weeklyRate: number | null;
   /** Required for an Expense; must be null for Income. */
   account: Account | null;
   oneOff: boolean;

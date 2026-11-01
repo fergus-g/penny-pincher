@@ -44,6 +44,19 @@ class EntryTest {
 		assertThat(dueOn(null).dueDayIn(YearMonth.of(2026, 11))).isNull();
 	}
 
+	@Test
+	void aWeeklyRateCostsItsRateTimesThePaydayWeeks() {
+		Entry food = new Entry(EntryType.EXPENSE, "Food", null, null, Account.REVOLUT, YearMonth.of(2026, 1), null);
+		food.setWeeklyRate(new BigDecimal("180.00"));
+		assertThat(food.amountIn(YearMonth.of(2026, 11))).isEqualByComparingTo("720.00");
+		assertThat(food.amountIn(YearMonth.of(2026, 12))).isEqualByComparingTo("900.00");
+	}
+
+	@Test
+	void aMonthlyAmountIsTheSameEveryMonth() {
+		assertThat(dueOn(null).amountIn(YearMonth.of(2026, 12))).isEqualByComparingTo("10");
+	}
+
 	private static Entry dueOn(Integer day) {
 		Entry entry = new Entry(EntryType.EXPENSE, "Housing", "Rent", BigDecimal.TEN, Account.AIB,
 				YearMonth.of(2026, 1), null);

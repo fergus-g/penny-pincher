@@ -1,11 +1,11 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, inject, input, model, OnInit, output, signal } from '@angular/core';
-import { rxResource } from '@angular/core/rxjs-interop';
+import { rxResource, toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { errorMessage } from '../error-message';
 import { MonthApi } from '../month-api';
-import { monthLabel } from '../month-label';
+import { monthLabel, paydayWeeks } from '../month-label';
 import {
   Account,
   ACCOUNTS,
@@ -15,6 +15,8 @@ import {
   Pot,
   UpdateEntryRequest,
 } from '../month.model';
+
+const euros = new Intl.NumberFormat('en', { style: 'currency', currency: 'EUR' });
 
 /**
  * Add form when `entry` is null, edit form otherwise. Emits `saved` once the backend accepts it,
@@ -95,6 +97,8 @@ export class EntryForm implements OnInit {
       // At most 2 decimal places, matching the backend's @Digits(fraction = 2).
       Validators.pattern(/^-?\d+(\.\d{1,2})?$/),
     ]),
+    /** Whether `amount` is the monthly amount or an Expense's Weekly Rate. */
+    pricing: new FormControl<'MONTHLY' | 'WEEKLY'>('MONTHLY', { nonNullable: true }),
     account: new FormControl<Account>(DEFAULT_ACCOUNT, { nonNullable: true }),
     oneOff: new FormControl(false, { nonNullable: true }),
     potId: new FormControl<number | null>(null),
@@ -106,13 +110,33 @@ export class EntryForm implements OnInit {
   });
   protected readonly accounts = ACCOUNTS;
 
+  private readonly pricing = toSignal(this.form.controls.pricing.valueChanges, {
+    initialValue: this.form.controls.pricing.value,
+  });
+  private readonly amount = toSignal(this.form.controls.amount.valueChanges, {
+    initialValue: this.form.controls.amount.value,
+  });
+  protected readonly weekly = computed(
+    () => this.type() === 'EXPENSE' && this.pricing() === 'WEEKLY',
+  );
+  /** The month's sum for a Weekly Rate, e.g. "€180.00/week × 5 = €900.00"; null otherwise. */
+  protected readonly weeklySum = computed(() => {
+    const rate = Number(this.amount());
+    if (!this.weekly() || !(rate > 0)) {
+      return null;
+    }
+    const weeks = paydayWeeks(this.month());
+    return `${euros.format(rate)}/week × ${weeks} = ${euros.format(rate * weeks)} in ${monthLabel(this.month())}`;
+  });
+
   ngOnInit(): void {
     const entry = this.entry();
     if (entry) {
       this.form.setValue({
         category: entry.category,
         name: entry.name ?? '',
-        amount: entry.amount,
+        amount: entry.weeklyRate ?? entry.amount,
+        pricing: entry.weeklyRate !== null ? 'WEEKLY' : 'MONTHLY',
         account: entry.account ?? DEFAULT_ACCOUNT,
         oneOff: entry.endMonth === entry.startMonth,
         potId: entry.potId,
@@ -131,11 +155,14 @@ export class EntryForm implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
-    const { category, name, amount, account, oneOff, potId, dueDay } = this.form.getRawValue();
+    const { category, name, amount, pricing, account, oneOff, potId, dueDay } =
+      this.form.getRawValue();
+    const weekly = this.type() === 'EXPENSE' && pricing === 'WEEKLY';
     const body: UpdateEntryRequest = {
       category: category.trim(),
       name: name.trim() || null,
-      amount: amount!,
+      amount: weekly ? null : amount!,
+      weeklyRate: weekly ? amount! : null,
       // Income lands outside the app, so only an Expense has an Account.
       account: this.type() === 'EXPENSE' ? account : null,
       oneOff,
