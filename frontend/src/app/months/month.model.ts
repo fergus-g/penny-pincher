@@ -14,9 +14,8 @@ export interface Entry {
   createdAt: string;
 }
 
-/** Body of PUT /api/entries/{id}. The start month can't change after creation. */
+/** Body of PUT /api/entries/{id}. The type and start month can't change after creation. */
 export interface UpdateEntryRequest {
-  type: EntryType;
   category: string;
   name: string | null;
   amount: number;
@@ -25,6 +24,7 @@ export interface UpdateEntryRequest {
 
 /** Body of POST /api/entries. `startMonth` is the month being viewed. */
 export interface CreateEntryRequest extends UpdateEntryRequest {
+  type: EntryType;
   startMonth: string;
 }
 

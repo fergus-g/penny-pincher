@@ -29,7 +29,6 @@ public class EntryService {
 	@Transactional
 	public EntryResponse update(Long id, UpdateEntryRequest request) {
 		Entry entry = findEntry(id);
-		entry.setType(request.type());
 		entry.setCategory(request.category());
 		entry.setName(request.name());
 		entry.setAmount(request.amount());

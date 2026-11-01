@@ -47,22 +47,53 @@
   color: #c62828;
 }
 
-.columns {
+.sections {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
   gap: 2rem;
+  align-items: start;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
 
   h2 {
+    flex: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
     margin: 0;
     font-size: 1.25rem;
   }
 }
 
-.column-header {
+.section-toggle {
+  flex: 1;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.5rem;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.summary {
+  font-size: 0.875rem;
+  font-weight: normal;
+  color: #666;
+}
+
+.chevron {
+  width: 1rem;
 }
 
 .entry-end {
@@ -103,4 +134,22 @@ dialog {
   &.error {
     color: #c62828;
   }
+}
+
+/* Played once on a just-added Entry: a tint in its section's colour that fades out. */
+.entry.flash {
+  animation: flash 1.5s ease-out;
+}
+
+@keyframes flash {
+  from {
+    background: var(--flash-colour, #fde9d3);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+.entry.income {
+  --flash-colour: #dce8f8;
 }

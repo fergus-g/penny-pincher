@@ -79,7 +79,8 @@ class EntryServiceTest {
 		Entry entry = entry(EntryType.EXPENSE, "1000.00");
 		given(this.entryRepository.findById(1L)).willReturn(Optional.of(entry));
 		EntryResponse response = this.entryService.update(1L,
-				new UpdateEntryRequest(EntryType.EXPENSE, "Housing", "Rent", new BigDecimal("1100.00"), true));
+				new UpdateEntryRequest("Housing", "Rent", new BigDecimal("1100.00"), true));
+		assertThat(response.type()).isEqualTo(EntryType.EXPENSE);
 		assertThat(response.category()).isEqualTo("Housing");
 		assertThat(response.name()).isEqualTo("Rent");
 		assertThat(response.amount()).isEqualByComparingTo("1100.00");
@@ -91,14 +92,14 @@ class EntryServiceTest {
 		Entry entry = new Entry(EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), OCT, OCT);
 		given(this.entryRepository.findById(1L)).willReturn(Optional.of(entry));
 		EntryResponse response = this.entryService.update(1L,
-				new UpdateEntryRequest(EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), false));
+				new UpdateEntryRequest("Tech", "Laptop", new BigDecimal("300.50"), false));
 		assertThat(response.endMonth()).isNull();
 	}
 
 	@Test
 	void updateMissingEntryThrowsNotFound() {
 		given(this.entryRepository.findById(99L)).willReturn(Optional.empty());
-		UpdateEntryRequest request = new UpdateEntryRequest(EntryType.EXPENSE, "X", null, BigDecimal.ONE, false);
+		UpdateEntryRequest request = new UpdateEntryRequest("X", null, BigDecimal.ONE, false);
 		assertThatThrownBy(() -> this.entryService.update(99L, request)).isInstanceOfSatisfying(
 				ResponseStatusException.class, (ex) -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
 	}

@@ -69,10 +69,6 @@ public class Entry {
 		return this.type;
 	}
 
-	public void setType(EntryType type) {
-		this.type = type;
-	}
-
 	public String getCategory() {
 		return this.category;
 	}
