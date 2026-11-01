@@ -43,6 +43,7 @@ class EntryServiceTest {
 		given(this.entryRepository.save(any(Entry.class))).willAnswer((invocation) -> invocation.getArgument(0));
 		EntryResponse response = this.entryService.create(createRequest(false));
 		assertThat(response.endMonth()).isNull();
+		assertThat(response.account()).isEqualTo(Account.REVOLUT);
 	}
 
 	@Test
@@ -75,31 +76,60 @@ class EntryServiceTest {
 	}
 
 	@Test
+	void transferCoversExpensesOnRevolut() {
+		given(this.entryRepository.findActiveIn(OCT)).willReturn(List.of(entry(EntryType.INCOME, "2500.00"),
+				entry(EntryType.EXPENSE, "1000.00"), entry(EntryType.EXPENSE, "200.00", Account.REVOLUT),
+				entry(EntryType.EXPENSE, "100.00", Account.REVOLUT)));
+		assertThat(this.entryService.getMonth(OCT).transfers()).singleElement().satisfies((transfer) -> {
+			assertThat(transfer.account()).isEqualTo(Account.REVOLUT);
+			assertThat(transfer.amount()).isEqualByComparingTo("300.00");
+		});
+	}
+
+	@Test
+	void transferIsNegativeWhenRevolutIncomeExceedsItsExpenses() {
+		given(this.entryRepository.findActiveIn(OCT)).willReturn(List.of(
+				entry(EntryType.INCOME, "500.00", Account.REVOLUT), entry(EntryType.EXPENSE, "120.00", Account.REVOLUT)));
+		assertThat(this.entryService.getMonth(OCT).transfers().get(0).amount()).isEqualByComparingTo("-380.00");
+	}
+
+	@Test
+	void transferIsZeroWithNoRevolutActivity() {
+		given(this.entryRepository.findActiveIn(OCT))
+			.willReturn(List.of(entry(EntryType.INCOME, "2500.00"), entry(EntryType.EXPENSE, "1000.00")));
+		assertThat(this.entryService.getMonth(OCT).transfers()).singleElement().satisfies((transfer) -> {
+			assertThat(transfer.account()).isEqualTo(Account.REVOLUT);
+			assertThat(transfer.amount()).isZero();
+		});
+	}
+
+	@Test
 	void updateChangesFieldsAndCanMakeEntryOneOff() {
 		Entry entry = entry(EntryType.EXPENSE, "1000.00");
 		given(this.entryRepository.findById(1L)).willReturn(Optional.of(entry));
 		EntryResponse response = this.entryService.update(1L,
-				new UpdateEntryRequest("Housing", "Rent", new BigDecimal("1100.00"), true));
+				new UpdateEntryRequest("Housing", "Rent", new BigDecimal("1100.00"), Account.REVOLUT, true));
 		assertThat(response.type()).isEqualTo(EntryType.EXPENSE);
 		assertThat(response.category()).isEqualTo("Housing");
 		assertThat(response.name()).isEqualTo("Rent");
 		assertThat(response.amount()).isEqualByComparingTo("1100.00");
+		assertThat(response.account()).isEqualTo(Account.REVOLUT);
 		assertThat(response.endMonth()).isEqualTo(OCT);
 	}
 
 	@Test
 	void updateCanMakeOneOffEntryRecurring() {
-		Entry entry = new Entry(EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), OCT, OCT);
+		Entry entry = new Entry(EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), Account.AIB, OCT, OCT);
 		given(this.entryRepository.findById(1L)).willReturn(Optional.of(entry));
 		EntryResponse response = this.entryService.update(1L,
-				new UpdateEntryRequest("Tech", "Laptop", new BigDecimal("300.50"), false));
+				new UpdateEntryRequest("Tech", "Laptop", new BigDecimal("300.50"), Account.AIB, false));
 		assertThat(response.endMonth()).isNull();
 	}
 
 	@Test
 	void updateMissingEntryThrowsNotFound() {
 		given(this.entryRepository.findById(99L)).willReturn(Optional.empty());
-		UpdateEntryRequest request = new UpdateEntryRequest("X", null, BigDecimal.ONE, false);
+		UpdateEntryRequest request = new UpdateEntryRequest("X", null, BigDecimal.ONE, Account.AIB, false);
 		assertThatThrownBy(() -> this.entryService.update(99L, request)).isInstanceOfSatisfying(
 				ResponseStatusException.class, (ex) -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
 	}
@@ -121,11 +151,16 @@ class EntryServiceTest {
 	}
 
 	private static CreateEntryRequest createRequest(boolean oneOff) {
-		return new CreateEntryRequest(EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), OCT, oneOff);
+		return new CreateEntryRequest(EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), Account.REVOLUT, OCT,
+				oneOff);
 	}
 
 	private static Entry entry(EntryType type, String amount) {
-		return new Entry(type, "Test", null, new BigDecimal(amount), OCT, null);
+		return entry(type, amount, Account.AIB);
+	}
+
+	private static Entry entry(EntryType type, String amount, Account account) {
+		return new Entry(type, "Test", null, new BigDecimal(amount), account, OCT, null);
 	}
 
 }

@@ -16,7 +16,7 @@ import { Router } from '@angular/router';
 import { EntryForm } from '../entry-form/entry-form';
 import { MonthApi } from '../month-api';
 import { monthLabel, toDate } from '../month-label';
-import { Entry, EntryType, MonthSummary } from '../month.model';
+import { accountLabel, Entry, EntryType, HOME_ACCOUNT, MonthSummary } from '../month.model';
 
 /** The current month as "yyyy-MM". */
 export function currentMonth(): string {
@@ -104,6 +104,24 @@ export class MonthPage {
       bar: Math.min(percent, 100),
       rest: percent <= 100 ? `${100 - percent}% left` : `${percent - 100}% over`,
     };
+  });
+
+  /** What to move between Accounts this month, worded for display; empty when nothing moves. */
+  protected readonly transfers = computed(() => {
+    if (!this.summary.hasValue()) {
+      return [];
+    }
+    return this.summary
+      .value()
+      .transfers.filter((transfer) => transfer.amount !== 0)
+      .map((transfer) => ({
+        account: transfer.account,
+        amount: Math.abs(transfer.amount),
+        text:
+          transfer.amount > 0
+            ? { verb: 'Transfer', to: `to ${accountLabel(transfer.account)}` }
+            : { verb: 'Move', to: `back to ${accountLabel(HOME_ACCOUNT)}` },
+      }));
   });
 
   /** Each type's categories this month, most recently added first: quick picks when adding. */
@@ -248,6 +266,8 @@ export class MonthPage {
       ? { label: 'One-off', tone: 'one-off' }
       : { label: `Until ${monthLabel(entry.endMonth, 'short')}`, tone: 'until' };
   }
+
+  protected readonly accountLabel = accountLabel;
 
   protected entryLabel(entry: Entry): string {
     return entry.name ?? entry.category;
