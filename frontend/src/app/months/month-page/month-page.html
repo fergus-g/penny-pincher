@@ -217,6 +217,41 @@
     } @placeholder {
       <div class="chart-placeholder"></div>
     }
+
+    <section class="card pots" aria-labelledby="pots-title">
+      <div class="section-header" [class.open]="pots().length > 0">
+        <h2 id="pots-title">
+          <span class="title">Pots</span>
+          @if (pots().length === 0) {
+            <span class="summary">Track savings and debts month by month</span>
+          }
+        </h2>
+        <button type="button" class="add-button" aria-label="Add Pot" (click)="openAddPot()">
+          + Pot
+        </button>
+      </div>
+      @for (row of pots(); track row.pot.id) {
+        <div class="pot" [attr.data-pot-id]="row.pot.id">
+          <button type="button" class="pot-main" (click)="openEditPot(row.pot.id)">
+            <span class="entry-name"
+              ><span class="visually-hidden">Edit </span>{{ row.pot.name }}</span
+            >
+            <span class="entry-meta">
+              {{ row.meta }}
+              @if (row.pot.checkedIn) {
+                <span class="badge checked-in">Checked in</span>
+              }
+            </span>
+          </button>
+          <span class="amount" [class.negative]="row.shown < 0">{{
+            row.shown | currency: 'EUR'
+          }}</span>
+          <button type="button" class="check-in-button" (click)="openCheckIn(row.pot)">
+            Check in<span class="visually-hidden"> {{ row.pot.name }}</span>
+          </button>
+        </div>
+      }
+    </section>
   } @else {
     <p class="message">Loading…</p>
   }
@@ -229,10 +264,34 @@
       [entry]="editing.entry"
       [month]="month()"
       [categories]="recentCategories()[editing.type]"
+      [pots]="potList()"
       [(saving)]="saving"
       (saved)="onSaved($event)"
       (deleted)="onDeleted()"
       (cancelled)="dialog.close()"
     />
+  }
+</dialog>
+
+<dialog #potDialog (cancel)="onDialogCancel($event)" (close)="potEditing.set(null)">
+  @if (potEditing(); as editing) {
+    @if (editing.form === 'pot') {
+      <app-pot-form
+        [pot]="editing.pot"
+        [month]="month()"
+        [(saving)]="saving"
+        (saved)="onPotChanged()"
+        (deleted)="onPotChanged()"
+        (cancelled)="potDialog.close()"
+      />
+    } @else {
+      <app-check-in-form
+        [pot]="editing.pot"
+        [month]="month()"
+        [(saving)]="saving"
+        (saved)="onPotChanged()"
+        (cancelled)="potDialog.close()"
+      />
+    }
   }
 </dialog>

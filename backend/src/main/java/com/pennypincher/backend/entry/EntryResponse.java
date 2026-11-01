@@ -13,11 +13,12 @@ public record EntryResponse(
 		Account account,
 		YearMonth startMonth,
 		YearMonth endMonth,
+		Long potId,
 		Instant createdAt) {
 
 	static EntryResponse from(Entry entry) {
 		return new EntryResponse(entry.getId(), entry.getType(), entry.getCategory(), entry.getName(),
-				entry.getAmount(), entry.getAccount(), entry.getStartMonth(), entry.getEndMonth(),
+				entry.getAmount(), entry.getAccount(), entry.getStartMonth(), entry.getEndMonth(), entry.getPotId(),
 				entry.getCreatedAt());
 	}
 

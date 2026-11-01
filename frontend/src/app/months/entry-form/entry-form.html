@@ -101,6 +101,18 @@
       </div>
     </div>
 
+    @if (type() === 'EXPENSE' && potOptions().length > 0) {
+      <div class="field">
+        <label for="entry-pot">Pays into pot <span class="optional">(optional)</span></label>
+        <select id="entry-pot" class="text-input" formControlName="potId">
+          <option [ngValue]="null">None</option>
+          @for (pot of potOptions(); track pot.id) {
+            <option [ngValue]="pot.id">{{ pot.name }}</option>
+          }
+        </select>
+      </div>
+    }
+
     <fieldset>
       <legend>How often?</legend>
       <label class="option">

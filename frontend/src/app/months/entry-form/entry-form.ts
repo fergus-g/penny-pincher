@@ -3,6 +3,7 @@ import { Component, computed, inject, input, model, OnInit, output, signal } fro
 import { rxResource } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 
+import { errorMessage } from '../error-message';
 import { MonthApi } from '../month-api';
 import { monthLabel } from '../month-label';
 import {
@@ -11,19 +12,9 @@ import {
   Entry,
   EntryType,
   HOME_ACCOUNT,
+  Pot,
   UpdateEntryRequest,
 } from '../month.model';
-
-/** Turns a backend ProblemDetail (with per-field `errors`) into one line of text. */
-function errorMessage(error: HttpErrorResponse, fallback: string): string {
-  const fieldErrors: Record<string, string> | undefined = error.error?.errors;
-  if (fieldErrors) {
-    return Object.entries(fieldErrors)
-      .map(([field, message]) => `${field} ${message}`)
-      .join(', ');
-  }
-  return error.error?.detail ?? fallback;
-}
 
 /**
  * Add form when `entry` is null, edit form otherwise. Emits `saved` once the backend accepts it,
@@ -44,6 +35,8 @@ export class EntryForm implements OnInit {
   readonly entry = input<Entry | null>(null);
   /** Recently used categories, offered as quick picks when adding. */
   readonly categories = input<string[]>([]);
+  /** Every Pot; an Expense can pay into one that's in use this month. */
+  readonly pots = input<Pot[]>([]);
 
   /** Every category used before on this type. */
   private readonly knownCategories = rxResource({
@@ -74,6 +67,16 @@ export class EntryForm implements OnInit {
   protected readonly submitLabel = computed(() =>
     this.entry() ? 'Save changes' : `Add ${this.typeName()}`,
   );
+  /** Pots open this month, plus the one this Expense already pays into even if it's since archived. */
+  protected readonly potOptions = computed(() => {
+    const month = this.entry()?.startMonth ?? this.month();
+    return this.pots().filter(
+      (pot) =>
+        pot.id === this.entry()?.potId ||
+        (pot.openingMonth <= month && (pot.archivedFrom === null || pot.archivedFrom > month)),
+    );
+  });
+
   /** True while a save or delete is in flight. A model so the page can block closing the dialog. */
   readonly saving = model(false);
   /** Delete takes two clicks: the first turns the button into "Confirm delete". */
@@ -94,6 +97,7 @@ export class EntryForm implements OnInit {
     ]),
     account: new FormControl<Account>(HOME_ACCOUNT, { nonNullable: true }),
     oneOff: new FormControl(false, { nonNullable: true }),
+    potId: new FormControl<number | null>(null),
   });
   protected readonly accounts = ACCOUNTS;
 
@@ -106,6 +110,7 @@ export class EntryForm implements OnInit {
         amount: entry.amount,
         account: entry.account,
         oneOff: entry.endMonth === entry.startMonth,
+        potId: entry.potId,
       });
     }
   }
@@ -120,13 +125,14 @@ export class EntryForm implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
-    const { category, name, amount, account, oneOff } = this.form.getRawValue();
+    const { category, name, amount, account, oneOff, potId } = this.form.getRawValue();
     const body: UpdateEntryRequest = {
       category: category.trim(),
       name: name.trim() || null,
       amount: amount!,
       account,
       oneOff,
+      potId: this.type() === 'EXPENSE' ? potId : null,
     };
     const entry = this.entry();
     const request = entry
