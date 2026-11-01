@@ -3,7 +3,7 @@
 }
 
 .card {
-  padding: 24px 32px;
+  padding: 20px 24px;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--card);
@@ -21,17 +21,77 @@ h2 {
   font-size: 14px;
 }
 
-.body {
+/* The rail's pie, centred; the whole chart opens the details dialog. */
+.chart-button {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 32px;
+  justify-content: center;
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: none;
 }
 
 .chart {
   position: relative;
-  width: 220px;
-  height: 220px;
+  width: 200px;
+  height: 200px;
+
+  &.large {
+    width: 280px;
+    height: 280px;
+  }
+}
+
+dialog {
+  box-sizing: border-box;
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 24px 28px 28px;
+  border: none;
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 20px 50px rgb(22 25 30 / 0.2);
+
+  &::backdrop {
+    background: rgb(22 25 30 / 0.4);
+  }
+}
+
+.details-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+
+  h2 {
+    margin: 0;
+  }
+}
+
+.close {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -8px -10px 0 0;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
 }
 
 .slices {
@@ -79,7 +139,8 @@ li {
     padding: 16px 20px;
   }
 
-  .chart {
-    margin: 0 auto;
+  .chart.large {
+    width: 220px;
+    height: 220px;
   }
 }

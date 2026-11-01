@@ -47,159 +47,67 @@
   } @else if (summary.hasValue()) {
     @let month = summary.value();
 
-    <section class="card totals" aria-label="Month totals">
-      <div class="totals-top">
-        <div class="headline">
-          <span class="caption"
-            >Left over this month
-            <button type="button" class="add-button allocate-button" (click)="openAllocation()">
-              Allocate
-            </button></span
-          >
-          <span class="remainder" [class.negative]="month.remainder < 0">{{
-            month.remainder | currency: 'EUR'
-          }}</span>
-        </div>
-        <div class="split">
-          <div>
-            <span class="legend"><span class="swatch income"></span>Income</span>
-            <strong>{{ month.totalIncome | currency: 'EUR' }}</strong>
+    <!-- Centre column and right rail; the rail stacks under the totals on narrow screens. -->
+    <div class="layout">
+      <section class="card totals" aria-label="Month totals">
+        <div class="totals-top">
+          <div class="headline">
+            <span class="caption"
+              >Left over this month
+              <button type="button" class="add-button allocate-button" (click)="openAllocation()">
+                Allocate
+              </button></span
+            >
+            <span class="remainder" [class.negative]="month.remainder < 0">{{
+              month.remainder | currency: 'EUR'
+            }}</span>
           </div>
-          <div>
-            <span class="legend"><span class="swatch expense"></span>Expenses</span>
-            <strong>{{ month.totalExpenses | currency: 'EUR' }}</strong>
-          </div>
-        </div>
-      </div>
-      @if (spent(); as spent) {
-        <div class="spent">
-          <div
-            class="bar"
-            role="img"
-            [attr.aria-label]="spent.percent + '% of income spent, ' + spent.rest"
-          >
-            <div class="bar-fill" [style.width.%]="spent.bar"></div>
-          </div>
-          <div class="bar-labels" aria-hidden="true">
-            <span>{{ spent.percent }}% of income spent</span>
-            <span>{{ spent.rest }}</span>
+          <div class="split">
+            <div>
+              <span class="legend"><span class="swatch income"></span>Income</span>
+              <strong>{{ month.totalIncome | currency: 'EUR' }}</strong>
+            </div>
+            <div>
+              <span class="legend"><span class="swatch expense"></span>Expenses</span>
+              <strong>{{ month.totalExpenses | currency: 'EUR' }}</strong>
+            </div>
           </div>
         </div>
-      }
-    </section>
-
-    @if (transfers().length > 0) {
-      <!-- Always one line per Account, even at €0, so it reads the same every month. -->
-      <section class="card transfers" aria-labelledby="transfers-title">
-        <h2 id="transfers-title">Transfers</h2>
-        <ul>
-          @for (transfer of transfers(); track transfer.account) {
-            <li>
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M5 12h14M13 6l6 6-6 6" />
-              </svg>
-              <span
-                >Put <strong>{{ transfer.amount | currency: 'EUR' }}</strong> into
-                {{ transfer.label }}</span
-              >
-            </li>
-          }
-        </ul>
+        @if (spent(); as spent) {
+          <div class="spent">
+            <div
+              class="bar"
+              role="img"
+              [attr.aria-label]="spent.percent + '% of income spent, ' + spent.rest"
+            >
+              <div class="bar-fill" [style.width.%]="spent.bar"></div>
+            </div>
+            <div class="bar-labels" aria-hidden="true">
+              <span>{{ spent.percent }}% of income spent</span>
+              <span>{{ spent.rest }}</span>
+            </div>
+          </div>
+        }
       </section>
-    }
 
-    <section class="card allocation" aria-labelledby="allocation-title">
-      <h2 id="allocation-title">Allocation</h2>
-      @if (allocation(); as split) {
-        @if (split.shortfall) {
-          <p class="warning" role="note">
-            <strong>Shortfall:</strong> Savings and Allowance are
-            {{ split.shortfallBy | currency: 'EUR' }} more than what's left over this month. They're
-            still transferred in full, so you'll be moving more than is left over.
-          </p>
+      <aside class="rail" aria-label="Month at a glance">
+        <!-- Chart.js is loaded only once the chart scrolls into view, keeping it out of the first load. -->
+        @defer (on viewport) {
+          <app-expense-chart [categories]="month.expensesByCategory" />
+        } @placeholder {
+          <div class="chart-placeholder"></div>
         }
-        @if (split.debtPotName && split.paidOffLabel) {
-          <div class="paid-off" role="note">
-            <p>
-              <strong>{{ split.debtPotName }} was paid off in {{ split.paidOffLabel }}.</strong>
-              @if (split.savingsPotName) {
-                Debt Repayment now goes to {{ split.savingsPotName }}.
-              } @else {
-                Debt Repayment isn't going anywhere yet.
-              }
-            </p>
-            <button type="button" class="text-button" (click)="openAllocation()">
-              Choose a new debt
-            </button>
-          </div>
-        }
-        <dl>
-          <div>
-            <dt>Savings</dt>
-            <dd>
-              <strong>{{ split.savings | currency: 'EUR' }}</strong>
-              <span class="target">{{ split.savingsPotName ?? 'Not assigned to a pot' }}</span>
-            </dd>
-          </div>
-          <div>
-            <dt>Allowance</dt>
-            <dd>
-              <strong>{{ split.allowance | currency: 'EUR' }}</strong>
-              <span class="target">Spending money</span>
-            </dd>
-          </div>
-          <div>
-            <dt>Debt Repayment</dt>
-            <dd>
-              <strong>{{ split.debtRepayment | currency: 'EUR' }}</strong>
-              <span class="target">{{ split.debtPotName ?? 'Not assigned to a pot' }}</span>
-            </dd>
-          </div>
-        </dl>
-      } @else {
-        <div class="setup">
-          <p>
-            Set up your Allocation to split what's left over into Savings, Allowance and Debt
-            Repayment.
-          </p>
-          <button type="button" class="add-button" (click)="openAllocation()">Set up</button>
-        </div>
-      }
-    </section>
+      </aside>
 
-    <div class="sections">
-      @for (section of sections(); track section.type) {
-        <section
-          class="card entries"
-          [class.income]="section.type === 'INCOME'"
-          [class.expense]="section.type === 'EXPENSE'"
-        >
-          <div class="section-header" [class.open]="section.open">
-            <h2>
-              @if (section.entries.length === 0) {
-                <span class="title">{{ section.title }}</span>
-                <span class="summary">{{ section.empty }}</span>
-              } @else {
-                <button
-                  type="button"
-                  class="section-toggle"
-                  [attr.aria-expanded]="section.open"
-                  [attr.aria-controls]="'entries-' + section.type"
-                  (click)="toggle(section.type)"
-                >
+      <div class="centre">
+        @if (transfers().length > 0) {
+          <!-- Always one line per Account, even at €0, so it reads the same every month. -->
+          <section class="card transfers" aria-labelledby="transfers-title">
+            <h2 id="transfers-title">Transfers</h2>
+            <ul>
+              @for (transfer of transfers(); track transfer.account) {
+                <li>
                   <svg
-                    class="chevron"
-                    [class.open]="section.open"
                     width="18"
                     height="18"
                     viewBox="0 0 24 24"
@@ -210,112 +118,211 @@
                     stroke-linejoin="round"
                     aria-hidden="true"
                   >
-                    <path d="M9 18l6-6-6-6" />
+                    <path d="M5 12h14M13 6l6 6-6 6" />
                   </svg>
-                  <span class="title">{{ section.title }}</span>
-                  <span class="summary"
-                    >{{ section.count }} · {{ section.total | currency: 'EUR' }}</span
+                  <span
+                    >Put <strong>{{ transfer.amount | currency: 'EUR' }}</strong> into
+                    {{ transfer.label }}</span
                   >
-                </button>
+                </li>
               }
-            </h2>
-            <button
-              type="button"
-              class="add-button"
-              [attr.aria-label]="'Add ' + section.noun"
-              (click)="openAdd(section.type)"
+            </ul>
+          </section>
+        }
+
+        <section class="card allocation" aria-labelledby="allocation-title">
+          <h2 id="allocation-title">Allocation</h2>
+          @if (allocation(); as split) {
+            @if (split.shortfall) {
+              <p class="warning" role="note">
+                <strong>Shortfall:</strong> Savings and Allowance are
+                {{ split.shortfallBy | currency: 'EUR' }} more than what's left over this month.
+                They're still transferred in full, so you'll be moving more than is left over.
+              </p>
+            }
+            @if (split.debtPotName && split.paidOffLabel) {
+              <div class="paid-off" role="note">
+                <p>
+                  <strong>{{ split.debtPotName }} was paid off in {{ split.paidOffLabel }}.</strong>
+                  @if (split.savingsPotName) {
+                    Debt Repayment now goes to {{ split.savingsPotName }}.
+                  } @else {
+                    Debt Repayment isn't going anywhere yet.
+                  }
+                </p>
+                <button type="button" class="text-button" (click)="openAllocation()">
+                  Choose a new debt
+                </button>
+              </div>
+            }
+            <dl>
+              <div>
+                <dt>Savings</dt>
+                <dd>
+                  <strong>{{ split.savings | currency: 'EUR' }}</strong>
+                  <span class="target">{{ split.savingsPotName ?? 'Not assigned to a pot' }}</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Allowance</dt>
+                <dd>
+                  <strong>{{ split.allowance | currency: 'EUR' }}</strong>
+                  <span class="target">Spending money</span>
+                </dd>
+              </div>
+              <div>
+                <dt>Debt Repayment</dt>
+                <dd>
+                  <strong>{{ split.debtRepayment | currency: 'EUR' }}</strong>
+                  <span class="target">{{ split.debtPotName ?? 'Not assigned to a pot' }}</span>
+                </dd>
+              </div>
+            </dl>
+          } @else {
+            <div class="setup">
+              <p>
+                Set up your Allocation to split what's left over into Savings, Allowance and Debt
+                Repayment.
+              </p>
+              <button type="button" class="add-button" (click)="openAllocation()">Set up</button>
+            </div>
+          }
+        </section>
+
+        <div class="sections">
+          @for (section of sections(); track section.type) {
+            <section
+              class="card entries"
+              [class.income]="section.type === 'INCOME'"
+              [class.expense]="section.type === 'EXPENSE'"
             >
-              + {{ section.noun }}
-            </button>
-          </div>
-          <!-- Always present so the toggle's aria-controls has a target; rows only when open. -->
-          <div [id]="'entries-' + section.type">
-            @if (section.open) {
-              @for (entry of section.entries; track entry.id) {
-                @let badge = kind(entry);
-                <!-- The whole row opens edit, so it's one big target on phones too. -->
+              <div class="section-header" [class.open]="section.open">
+                <h2>
+                  @if (section.entries.length === 0) {
+                    <span class="title">{{ section.title }}</span>
+                    <span class="summary">{{ section.empty }}</span>
+                  } @else {
+                    <button
+                      type="button"
+                      class="section-toggle"
+                      [attr.aria-expanded]="section.open"
+                      [attr.aria-controls]="'entries-' + section.type"
+                      (click)="toggle(section.type)"
+                    >
+                      <svg
+                        class="chevron"
+                        [class.open]="section.open"
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M9 18l6-6-6-6" />
+                      </svg>
+                      <span class="title">{{ section.title }}</span>
+                      <span class="summary"
+                        >{{ section.count }} · {{ section.total | currency: 'EUR' }}</span
+                      >
+                    </button>
+                  }
+                </h2>
                 <button
                   type="button"
-                  class="entry"
-                  [attr.data-entry-id]="entry.id"
-                  [class.flash]="entry.id === flashingId()"
-                  (animationend)="endFlash()"
-                  (click)="openEdit(entry)"
+                  class="add-button"
+                  [attr.aria-label]="'Add ' + section.noun"
+                  (click)="openAdd(section.type)"
                 >
-                  <span class="entry-main">
-                    <span class="entry-name"
-                      ><span class="visually-hidden">Edit </span>{{ entryLabel(entry) }}</span
-                    >
-                    <span class="entry-meta">
-                      {{ entryMeta(entry) }}
-                      <span class="badge" [class]="badge.tone">{{ badge.label }}</span>
-                    </span>
-                  </span>
-                  <span class="amount">{{ entry.amount | currency: 'EUR' }}</span>
-                  <svg
-                    class="edit-icon"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
-                  </svg>
+                  + {{ section.noun }}
                 </button>
-              }
-            }
-          </div>
-        </section>
-      }
-    </div>
-
-    <!-- Chart.js is loaded only once the chart scrolls into view, keeping it out of the first load. -->
-    @defer (on viewport) {
-      <app-expense-chart [categories]="month.expensesByCategory" />
-    } @placeholder {
-      <div class="chart-placeholder"></div>
-    }
-
-    <section class="card pots" aria-labelledby="pots-title">
-      <div class="section-header" [class.open]="pots().length > 0">
-        <h2 id="pots-title">
-          <span class="title">Pots</span>
-          @if (pots().length === 0) {
-            <span class="summary">Track savings and debts month by month</span>
+              </div>
+              <!-- Always present so the toggle's aria-controls has a target; rows only when open. -->
+              <div [id]="'entries-' + section.type">
+                @if (section.open) {
+                  @for (entry of section.entries; track entry.id) {
+                    @let badge = kind(entry);
+                    <!-- The whole row opens edit, so it's one big target on phones too. -->
+                    <button
+                      type="button"
+                      class="entry"
+                      [attr.data-entry-id]="entry.id"
+                      [class.flash]="entry.id === flashingId()"
+                      (animationend)="endFlash()"
+                      (click)="openEdit(entry)"
+                    >
+                      <span class="entry-main">
+                        <span class="entry-name"
+                          ><span class="visually-hidden">Edit </span>{{ entryLabel(entry) }}</span
+                        >
+                        <span class="entry-meta">
+                          {{ entryMeta(entry) }}
+                          <span class="badge" [class]="badge.tone">{{ badge.label }}</span>
+                        </span>
+                      </span>
+                      <span class="amount">{{ entry.amount | currency: 'EUR' }}</span>
+                      <svg
+                        class="edit-icon"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+                      </svg>
+                    </button>
+                  }
+                }
+              </div>
+            </section>
           }
-        </h2>
-        <button type="button" class="add-button" aria-label="Add Pot" (click)="openAddPot()">
-          + Pot
-        </button>
-      </div>
-      @for (row of pots(); track row.pot.id) {
-        <div class="pot" [attr.data-pot-id]="row.pot.id">
-          <button type="button" class="pot-main" (click)="openEditPot(row.pot.id)">
-            <span class="entry-name"
-              ><span class="visually-hidden">Edit </span>{{ row.pot.name }}</span
-            >
-            <span class="entry-meta">
-              {{ row.meta }}
-              @if (row.pot.checkedIn) {
-                <span class="badge checked-in">Checked in</span>
-              }
-            </span>
-          </button>
-          <span class="amount" [class.negative]="row.shown < 0">{{
-            row.shown | currency: 'EUR'
-          }}</span>
-          <button type="button" class="check-in-button" (click)="openCheckIn(row.pot)">
-            Check in<span class="visually-hidden"> {{ row.pot.name }}</span>
-          </button>
         </div>
-      }
-    </section>
+
+        <section class="card pots" aria-labelledby="pots-title">
+          <div class="section-header" [class.open]="pots().length > 0">
+            <h2 id="pots-title">
+              <span class="title">Pots</span>
+              @if (pots().length === 0) {
+                <span class="summary">Track savings and debts month by month</span>
+              }
+            </h2>
+            <button type="button" class="add-button" aria-label="Add Pot" (click)="openAddPot()">
+              + Pot
+            </button>
+          </div>
+          @for (row of pots(); track row.pot.id) {
+            <div class="pot" [attr.data-pot-id]="row.pot.id">
+              <button type="button" class="pot-main" (click)="openEditPot(row.pot.id)">
+                <span class="entry-name"
+                  ><span class="visually-hidden">Edit </span>{{ row.pot.name }}</span
+                >
+                <span class="entry-meta">
+                  {{ row.meta }}
+                  @if (row.pot.checkedIn) {
+                    <span class="badge checked-in">Checked in</span>
+                  }
+                </span>
+              </button>
+              <span class="amount" [class.negative]="row.shown < 0">{{
+                row.shown | currency: 'EUR'
+              }}</span>
+              <button type="button" class="check-in-button" (click)="openCheckIn(row.pot)">
+                Check in<span class="visually-hidden"> {{ row.pot.name }}</span>
+              </button>
+            </div>
+          }
+        </section>
+      </div>
+    </div>
   } @else {
     <p class="message">Loading…</p>
   }

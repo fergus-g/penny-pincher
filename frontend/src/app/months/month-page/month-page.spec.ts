@@ -633,34 +633,72 @@ describe('MonthPage expense chart', () => {
     return page;
   }
 
+  /** Clicks the rail's pie, opening the details dialog. */
+  async function openDetails(page: Awaited<ReturnType<typeof render>>) {
+    page.el.querySelector<HTMLButtonElement>('app-expense-chart .chart-button')!.click();
+    await page.fixture.whenStable();
+  }
+
   beforeEach(() => {
     HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
       this.open = true;
     };
+    HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+      this.open = false;
+      this.dispatchEvent(new Event('close'));
+    };
     api = new FakeMonthApi();
-  });
-
-  /** Each legend row as "label amount percent". */
-  const slices = (el: HTMLElement) =>
-    Array.from(el.querySelectorAll('app-expense-chart li'), (li) =>
-      Array.from(li.querySelectorAll('span:not(.swatch)'), (span) => span.textContent!.trim()).join(
-        ' ',
-      ),
-    );
-
-  it('list each category with its amount and share, largest first', async () => {
     api.months['2026-11'] = [
       entry(1, 'INCOME', 'Salary', 3200),
       { ...entry(2, 'EXPENSE', 'Rent', 750), category: 'Housing' },
       { ...entry(3, 'EXPENSE', 'Big shop', 200), category: 'Groceries' },
       { ...entry(4, 'EXPENSE', 'Top-up', 50), category: 'Groceries' },
     ];
+  });
+
+  /** Each row of the details list as "label amount percent". */
+  const slices = (el: HTMLElement) =>
+    Array.from(el.querySelectorAll('app-expense-chart dialog li'), (li) =>
+      Array.from(li.querySelectorAll('span:not(.swatch)'), (span) => span.textContent!.trim()).join(
+        ' ',
+      ),
+    );
+
+  it('sit in the right rail, between the totals and the centre column', async () => {
     const { el } = await renderWithChart(api);
 
-    expect(slices(el)).toEqual(['Housing €750.00 75%', 'Groceries €250.00 25%']);
-    expect(el.querySelector('app-expense-chart canvas')!.getAttribute('aria-label')).toBe(
+    const layout = el.querySelector('.layout')!;
+    expect(Array.from(layout.children, (child) => child.className.split(' ').at(-1))).toEqual([
+      'totals',
+      'rail',
+      'centre',
+    ]);
+    expect(layout.querySelector('aside.rail app-expense-chart')).not.toBeNull();
+  });
+
+  it('show only the pie in the rail, labelled with every slice', async () => {
+    const { el } = await renderWithChart(api);
+
+    const card = el.querySelector('app-expense-chart section')!;
+    expect(card.querySelector('li')).toBeNull();
+    expect(card.querySelector('canvas')!.getAttribute('aria-label')).toBe(
       'Pie chart of expenses: Housing 75%, Groceries 25%',
     );
+  });
+
+  it('open a dialog with the full list when the pie is clicked, and close it again', async () => {
+    const page = await renderWithChart(api);
+    const dialog = () => page.el.querySelector<HTMLDialogElement>('app-expense-chart dialog')!;
+    expect(slices(page.el)).toEqual([]);
+
+    await openDetails(page);
+    expect(dialog().open).toBe(true);
+    expect(slices(page.el)).toEqual(['Housing €750.00 75%', 'Groceries €250.00 25%']);
+
+    dialog().querySelector<HTMLButtonElement>('button.close')!.click();
+    await page.fixture.whenStable();
+    expect(dialog().open).toBe(false);
+    expect(slices(page.el)).toEqual([]);
   });
 
   it('fold categories past the seventh into one Other slice, still summing to total Expenses', async () => {
@@ -668,9 +706,10 @@ describe('MonthPage expense chart', () => {
       ...entry(i + 1, 'EXPENSE', `Thing ${i}`, 100 - i),
       category: `Category ${i}`,
     }));
-    const { el } = await renderWithChart(api);
+    const page = await renderWithChart(api);
+    await openDetails(page);
 
-    const rows = slices(el);
+    const rows = slices(page.el);
     expect(rows).toHaveLength(7);
     expect(rows.at(-1)).toBe('Other €279.00 32%');
     const amounts = rows.map((row) => Number(row.match(/€([\d,.]+)/)![1].replace(',', '')));
