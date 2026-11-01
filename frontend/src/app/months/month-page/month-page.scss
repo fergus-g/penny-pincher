@@ -93,6 +93,50 @@ main {
   background: var(--card);
 }
 
+/* Layout: a centre column and a narrower right rail, which stacks under the totals when narrow. */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'totals rail'
+    'centre rail';
+  gap: 24px;
+  align-items: start;
+}
+
+.layout > .totals {
+  grid-area: totals;
+}
+
+.rail,
+.centre {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+
+.rail {
+  grid-area: rail;
+}
+
+.centre {
+  grid-area: centre;
+}
+
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    grid-template-areas:
+      'totals'
+      'rail'
+      'centre';
+  }
+}
+
 /* Summary card */
 
 .totals {

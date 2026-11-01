@@ -1,5 +1,5 @@
 import { CurrencyPipe } from '@angular/common';
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, ElementRef, input, signal, viewChild } from '@angular/core';
 import { ArcElement, ChartConfiguration, PieController, Tooltip } from 'chart.js';
 import { BaseChartDirective, provideCharts } from 'ng2-charts';
 
@@ -22,7 +22,10 @@ interface Slice {
   colour: string;
 }
 
-/** Pie chart of the month's Expenses by category, with a list of the same figures beside it. */
+/**
+ * The month's Expenses by category as a pie, for the right rail: hover a slice for its figures,
+ * or click the chart for a dialog with a larger pie and the full list.
+ */
 @Component({
   imports: [BaseChartDirective, CurrencyPipe],
   // Only the pieces a pie needs, rather than all of Chart.js.
@@ -82,6 +85,20 @@ export class ExpenseChart {
       },
     },
   };
+
+  private readonly details = viewChild.required<ElementRef<HTMLDialogElement>>('details');
+  /** True while the details dialog is open; its larger pie is only drawn then. */
+  protected readonly showingDetails = signal(false);
+
+  protected openDetails(): void {
+    this.showingDetails.set(true);
+    this.details().nativeElement.showModal();
+  }
+
+  protected closeDetails(): void {
+    this.details().nativeElement.close();
+    this.showingDetails.set(false);
+  }
 
   protected readonly summary = computed(() =>
     this.slices()
