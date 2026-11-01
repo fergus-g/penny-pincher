@@ -101,6 +101,8 @@ class VisibleIntersectionObserver {
   disconnect() {}
 }
 
+const originalScrollIntoView = Element.prototype.scrollIntoView;
+
 describe('MonthPage sections', () => {
   beforeEach(() => {
     vi.stubGlobal('IntersectionObserver', VisibleIntersectionObserver);
@@ -113,7 +115,11 @@ describe('MonthPage sections', () => {
     Element.prototype.scrollIntoView = vi.fn();
   });
 
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    Element.prototype.scrollIntoView = originalScrollIntoView;
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
 
   let api: FakeMonthApi;
 
@@ -208,6 +214,25 @@ describe('MonthPage sections', () => {
     } as DOMRect);
     await addEntry(page, 'Expenses', { category: 'Food', name: 'Pizza', amount: '18' });
     expect(Element.prototype.scrollIntoView).toHaveBeenCalledTimes(1);
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest' });
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
+      behavior: 'smooth',
+      block: 'nearest',
+    });
+  });
+
+  it('do not replay the flash after collapsing mid-flash', async () => {
+    const page = await render(api);
+    await addEntry(page, 'Expenses', {
+      category: 'Transport',
+      name: 'Car service',
+      amount: '292.01',
+    });
+
+    page.toggle('Expenses')!.click();
+    await page.fixture.whenStable();
+    page.toggle('Expenses')!.click();
+    await page.fixture.whenStable();
+
+    expect(page.rows('Expenses').filter((row) => row.classList.contains('flash'))).toHaveLength(0);
   });
 });

@@ -62,14 +62,15 @@
             +
           </button>
         </div>
-        @if (section.open && section.entries.length > 0) {
-          <div [id]="'entries-' + section.type">
+        <!-- Always present so the toggle's aria-controls has a target; rows only when open. -->
+        <div [id]="'entries-' + section.type">
+          @if (section.open) {
             @for (entry of section.entries; track entry.id) {
               <div
                 class="entry"
                 [attr.data-entry-id]="entry.id"
                 [class.flash]="entry.id === flashingId()"
-                [class.income]="entry.type === 'INCOME'"
+                [class.income]="section.type === 'INCOME'"
                 (animationend)="endFlash()"
               >
                 <div>
@@ -83,8 +84,8 @@
                 </div>
               </div>
             }
-          </div>
-        }
+          }
+        </div>
       </section>
     }
   </div>
