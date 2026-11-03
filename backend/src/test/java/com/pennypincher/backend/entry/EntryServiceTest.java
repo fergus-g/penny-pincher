@@ -35,12 +35,17 @@ class EntryServiceTest {
 
 	private final PotService potService = mock(PotService.class);
 
-	private final EntryService entryService = new EntryService(this.entryRepository, this.potService);
+	private final PaymentService paymentService = mock(PaymentService.class);
 
-	/** No Pots and no Allocation unless a test says otherwise. */
+	private final EntryService entryService = new EntryService(this.entryRepository, this.potService,
+			this.paymentService);
+
+	/** No Pots, no Allocation and nothing paid unless a test says otherwise. */
 	@BeforeEach
 	void noPots() {
 		given(this.potService.monthOf(any(YearMonth.class))).willReturn(new PotMonth(List.of(), null));
+		given(this.paymentService.paidIn(any(YearMonth.class)))
+			.willReturn((entry) -> PaymentService.canBePaid(entry) ? false : null);
 	}
 
 	@Test
@@ -316,6 +321,31 @@ class EntryServiceTest {
 			assertThat(slice.category()).isEqualTo("Groceries");
 			assertThat(slice.amount()).isEqualByComparingTo("100.00");
 		});
+	}
+
+	@Test
+	void getMonthLeftIsTheAibTransferLessWhatsPaid() {
+		Entry rent = entry(EntryType.EXPENSE, "1000.00");
+		Entry phone = entry(EntryType.EXPENSE, "40.00");
+		Entry food = entry(EntryType.EXPENSE, "300.00", Account.REVOLUT);
+		given(this.entryRepository.findActiveIn(OCT)).willReturn(List.of(rent, phone, food));
+		given(this.paymentService.paidIn(OCT))
+			.willReturn((entry) -> PaymentService.canBePaid(entry) ? entry == rent : null);
+		List<Transfer> transfers = this.entryService.getMonth(OCT).transfers();
+		assertThat(transfers.get(0).amount()).isEqualByComparingTo("1040.00");
+		assertThat(transfers.get(0).left()).isEqualByComparingTo("40.00");
+		assertThat(transfers.get(1).left()).isNull();
+	}
+
+	@Test
+	void getMonthMarksEachEntryPaidOrNot() {
+		Entry rent = entry(EntryType.EXPENSE, "1000.00");
+		Entry food = entry(EntryType.EXPENSE, "300.00", Account.REVOLUT);
+		given(this.entryRepository.findActiveIn(OCT)).willReturn(List.of(rent, food));
+		given(this.paymentService.paidIn(OCT))
+			.willReturn((entry) -> PaymentService.canBePaid(entry) ? true : null);
+		assertThat(this.entryService.getMonth(OCT).entries()).extracting(EntryResponse::paid)
+			.containsExactly(true, null);
 	}
 
 	@Test

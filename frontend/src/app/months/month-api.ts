@@ -72,6 +72,18 @@ export class MonthApi {
     return this.http.put(`/api/months/${month}/allocation`, request);
   }
 
+  /** Ticks an AIB Expense as paid; only the current month can be ticked. */
+  pay(month: string, entryId: number): Observable<void> {
+    console.log('[MonthApi] pay', month, entryId);
+    return this.http.put<void>(`/api/months/${month}/payments/${entryId}`, null);
+  }
+
+  /** Unticks an AIB Expense. */
+  unpay(month: string, entryId: number): Observable<void> {
+    console.log('[MonthApi] unpay', month, entryId);
+    return this.http.delete<void>(`/api/months/${month}/payments/${entryId}`);
+  }
+
   /** Records the Pot's actual balance at the end of `month`. */
   checkIn(potId: number, month: string, balance: number): Observable<unknown> {
     console.log('[MonthApi] checkIn', potId, month, balance);

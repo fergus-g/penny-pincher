@@ -126,7 +126,9 @@
         <app-expense-calendar
           [month]="month.month"
           [entries]="month.entries"
+          [ticking]="ticking()"
           (edit)="openEdit($event)"
+          (paidChange)="setPaid($event)"
         />
         <!-- Chart.js is loaded only once the chart scrolls into view, keeping it out of the first load. -->
         @defer (on viewport) {
@@ -164,6 +166,27 @@
                 </li>
               }
             </ul>
+            @for (transfer of countdowns(); track transfer.account) {
+              <div class="left-to-go">
+                <div
+                  class="bar"
+                  role="img"
+                  [attr.aria-label]="
+                    (transfer.left | currency: 'EUR') +
+                    ' of ' +
+                    (transfer.amount | currency: 'EUR') +
+                    ' still to go out of ' +
+                    transfer.label
+                  "
+                >
+                  <div class="bar-fill" [style.width.%]="transfer.leftPercent"></div>
+                </div>
+                <p aria-hidden="true">
+                  {{ transfer.label }}: <strong>{{ transfer.left | currency: 'EUR' }}</strong> left
+                  of {{ transfer.amount | currency: 'EUR' }}
+                </p>
+              </div>
+            }
           </section>
         }
 
@@ -289,41 +312,58 @@
                 @if (section.open) {
                   @for (entry of section.entries; track entry.id) {
                     @let badge = kind(entry);
-                    <!-- The whole row opens edit, so it's one big target on phones too. -->
-                    <button
-                      type="button"
-                      class="entry"
-                      [attr.data-entry-id]="entry.id"
-                      [class.flash]="entry.id === flashingId()"
-                      (animationend)="endFlash()"
-                      (click)="openEdit(entry)"
-                    >
-                      <span class="entry-main">
-                        <span class="entry-name"
-                          ><span class="visually-hidden">Edit </span>{{ entryLabel(entry) }}</span
-                        >
-                        <span class="entry-meta">
-                          {{ entryMeta(entry) }}
-                          <span class="badge" [class]="badge.tone">{{ badge.label }}</span>
-                        </span>
-                      </span>
-                      <span class="amount">{{ entry.amount | currency: 'EUR' }}</span>
-                      <svg
-                        class="edit-icon"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        aria-hidden="true"
+                    @let tick = tickable(entry);
+                    <div class="entry-row" [class.paid]="tick && entry.paid">
+                      @if (tick) {
+                        <label class="tick">
+                          <input
+                            type="checkbox"
+                            [checked]="entry.paid"
+                            [disabled]="ticking().has(entry.id)"
+                            (change)="onTick(entry, $event)"
+                          />
+                          <span class="visually-hidden">Paid: {{ entryLabel(entry) }}</span>
+                        </label>
+                      } @else if (tickGap(entry)) {
+                        <span class="tick" aria-hidden="true"></span>
+                      }
+                      <!-- The rest of the row opens edit, so it's one big target on phones too. -->
+                      <button
+                        type="button"
+                        class="entry"
+                        [class.ticked]="tick || tickGap(entry)"
+                        [attr.data-entry-id]="entry.id"
+                        [class.flash]="entry.id === flashingId()"
+                        (animationend)="endFlash()"
+                        (click)="openEdit(entry)"
                       >
-                        <path d="M12 20h9" />
-                        <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
-                      </svg>
-                    </button>
+                        <span class="entry-main">
+                          <span class="entry-name"
+                            ><span class="visually-hidden">Edit </span>{{ entryLabel(entry) }}</span
+                          >
+                          <span class="entry-meta">
+                            {{ entryMeta(entry) }}
+                            <span class="badge" [class]="badge.tone">{{ badge.label }}</span>
+                          </span>
+                        </span>
+                        <span class="amount">{{ entry.amount | currency: 'EUR' }}</span>
+                        <svg
+                          class="edit-icon"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+                        </svg>
+                      </button>
+                    </div>
                   }
                 }
               </div>

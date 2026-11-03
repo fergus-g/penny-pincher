@@ -7,6 +7,11 @@ package com.pennypincher.backend.entry;
 public enum Account {
 
 	AIB,
-	REVOLUT
+	REVOLUT;
+
+	/** Whether this Account's Expenses can be ticked as paid (ADR 0003): only AIB. */
+	public boolean tracksPayments() {
+		return this == AIB;
+	}
 
 }
