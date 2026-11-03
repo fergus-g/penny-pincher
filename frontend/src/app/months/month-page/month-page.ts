@@ -12,11 +12,12 @@ import {
 } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
+import { finalize } from 'rxjs';
 
 import { AllocationForm } from '../allocation-form/allocation-form';
 import { CheckInForm } from '../check-in-form/check-in-form';
 import { EntryForm } from '../entry-form/entry-form';
-import { ExpenseCalendar } from '../expense-calendar/expense-calendar';
+import { ExpenseCalendar, PaidChange } from '../expense-calendar/expense-calendar';
 import { ExpenseChart } from '../expense-chart/expense-chart';
 import { MonthApi } from '../month-api';
 import { monthLabel, ordinal, toDate } from '../month-label';
@@ -31,6 +32,7 @@ import {
   PotBalance,
   potKindLabel,
 } from '../month.model';
+import { isCurrentMonth, isTickable } from '../payments';
 import { PotForm } from '../pot-form/pot-form';
 
 /** The current month as "yyyy-MM". */
@@ -184,10 +186,24 @@ export class MonthPage {
     if (!this.summary.hasValue()) {
       return [];
     }
-    return this.summary
-      .value()
-      .transfers.map((transfer) => ({ ...transfer, label: accountLabel(transfer.account) }));
+    return this.summary.value().transfers.map((transfer) => ({
+      ...transfer,
+      label: accountLabel(transfer.account),
+      /** How much of the Transfer is still to go out, as a share of the bar; null when untracked. */
+      leftPercent:
+        transfer.left === null || transfer.amount <= 0
+          ? null
+          : (transfer.left / transfer.amount) * 100,
+    }));
   });
+
+  /** Transfers whose Payments are tracked (AIB) and that have something going out. */
+  protected readonly countdowns = computed(() =>
+    this.transfers().filter((transfer) => transfer.left !== null && transfer.amount > 0),
+  );
+
+  /** Entries whose tick is being saved; their checkboxes wait. */
+  protected readonly ticking = signal<ReadonlySet<number>>(new Set());
 
   /** Each type's categories this month, most recently added first: quick picks when adding. */
   protected readonly recentCategories = computed(() => {
@@ -274,6 +290,44 @@ export class MonthPage {
         this.reveal(row, id);
       }
     });
+  }
+
+  protected tickable(entry: Entry): boolean {
+    return isTickable(entry, this.month());
+  }
+
+  /** This month, Expense rows that can't be ticked (Revolut) keep a gap so the rows line up. */
+  protected tickGap(entry: Entry): boolean {
+    return entry.type === 'EXPENSE' && entry.paid === null && isCurrentMonth(this.month());
+  }
+
+  /** Ticks or unticks an AIB Expense this month, then reloads the totals it changes. */
+  protected setPaid({ entry, paid }: PaidChange): void {
+    console.log('[MonthPage] paid changed', entry.id, paid);
+    const month = this.month();
+    this.ticking.update((ids) => new Set(ids).add(entry.id));
+    (paid ? this.monthApi.pay(month, entry.id) : this.monthApi.unpay(month, entry.id))
+      .pipe(
+        finalize(() =>
+          this.ticking.update((ids) => {
+            const next = new Set(ids);
+            next.delete(entry.id);
+            return next;
+          }),
+        ),
+      )
+      .subscribe({
+        next: () => this.summary.reload(),
+        // Reloading puts the checkbox back to what the backend has.
+        error: (error) => {
+          console.error('[MonthPage] paid change failed', error);
+          this.summary.reload();
+        },
+      });
+  }
+
+  protected onTick(entry: Entry, event: Event): void {
+    this.setPaid({ entry, paid: (event.target as HTMLInputElement).checked });
   }
 
   protected toggle(type: EntryType): void {

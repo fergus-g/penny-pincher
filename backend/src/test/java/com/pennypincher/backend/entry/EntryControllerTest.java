@@ -74,10 +74,11 @@ class EntryControllerTest {
 	void getMonthReturnsSummary() {
 		given(this.entryService.getMonth(OCT)).willReturn(new MonthSummaryResponse(OCT, List.of(laptop()),
 				BigDecimal.ZERO, new BigDecimal("300.50"), new BigDecimal("-300.50"),
-				List.of(new Transfer(Account.AIB, BigDecimal.ZERO), new Transfer(Account.REVOLUT, new BigDecimal("300.50"))),
+				List.of(new Transfer(Account.AIB, BigDecimal.ZERO, BigDecimal.ZERO),
+						new Transfer(Account.REVOLUT, new BigDecimal("300.50"), null)),
 				List.of(new CategoryTotal("Tech", new BigDecimal("300.50"))), List.of(), null));
 		assertThat(this.mvc.get().uri("/api/months/2026-10")).hasStatusOk().bodyJson().isLenientlyEqualTo("""
-				{"month":"2026-10","entries":[{"id":1}],"totalExpenses":300.50,"remainder":-300.50,"transfers":[{"account":"AIB","amount":0},{"account":"REVOLUT","amount":300.50}],
+				{"month":"2026-10","entries":[{"id":1}],"totalExpenses":300.50,"remainder":-300.50,"transfers":[{"account":"AIB","amount":0,"left":0},{"account":"REVOLUT","amount":300.50}],
 				"expensesByCategory":[{"category":"Tech","amount":300.50}]}
 				""");
 	}
@@ -137,7 +138,7 @@ class EntryControllerTest {
 
 	private static EntryResponse laptop() {
 		return new EntryResponse(1L, EntryType.EXPENSE, "Tech", "Laptop", new BigDecimal("300.50"), null, null, Account.REVOLUT,
-				OCT, OCT, null, 31, 31, Instant.parse("2026-10-31T21:30:43Z"));
+				OCT, OCT, null, 31, 31, null, Instant.parse("2026-10-31T21:30:43Z"));
 	}
 
 }

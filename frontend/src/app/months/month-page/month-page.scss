@@ -302,6 +302,35 @@ main {
 
 /* Transfers card */
 
+/* How much of a tracked Transfer is still to go out, emptying as Expenses are ticked off. */
+.left-to-go {
+  margin-top: 14px;
+
+  .bar {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #eef1f5;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--expense);
+    transition: width 0.3s;
+  }
+
+  p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+
+    strong {
+      color: var(--text);
+    }
+  }
+}
+
 .transfers {
   padding: 20px 32px;
 
@@ -517,24 +546,64 @@ main {
   }
 }
 
-.entry {
+/* A row: the paid tick for AIB Expenses this month, then the button that opens edit. */
+.entry-row {
   display: flex;
   align-items: center;
-  gap: 16px;
-  width: 100%;
   height: var(--entry-row);
-  padding: 0 24px;
-  border: none;
   border-bottom: 1px solid #f0f2f5;
-  background: transparent;
-  text-align: left;
 
   &:last-child {
     border-bottom: none;
   }
 
+  &.paid {
+    .entry-name,
+    .amount {
+      color: var(--muted);
+      text-decoration: line-through;
+    }
+  }
+}
+
+.entry {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  height: 100%;
+  padding: 0 24px;
+  border: none;
+  background: transparent;
+  text-align: left;
+
+  &.ticked {
+    padding-left: 4px;
+  }
+
   &:hover {
     background: #f7f8fa;
+  }
+}
+
+/* A 44px target around the checkbox, lined up with the rows' left padding. */
+.tick {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-left: 8px;
+  cursor: pointer;
+
+  input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--income);
+    cursor: inherit;
   }
 }
 

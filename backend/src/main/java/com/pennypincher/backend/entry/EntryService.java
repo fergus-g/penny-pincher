@@ -27,9 +27,12 @@ public class EntryService {
 
 	private final PotService potService;
 
-	public EntryService(EntryRepository entryRepository, PotService potService) {
+	private final PaymentService paymentService;
+
+	public EntryService(EntryRepository entryRepository, PotService potService, PaymentService paymentService) {
 		this.entryRepository = entryRepository;
 		this.potService = potService;
+		this.paymentService = paymentService;
 	}
 
 	@Transactional
@@ -46,7 +49,7 @@ public class EntryService {
 		entry.setPotId(request.potId());
 		entry.setDueDay(request.dueDay());
 		Entry saved = this.entryRepository.save(entry);
-		return EntryResponse.from(saved, saved.getStartMonth());
+		return response(saved);
 	}
 
 	@Transactional
@@ -65,7 +68,13 @@ public class EntryService {
 		entry.setEndMonth(request.oneOff() ? entry.getStartMonth() : null);
 		entry.setPotId(request.potId());
 		entry.setDueDay(request.dueDay());
-		return EntryResponse.from(entry, entry.getStartMonth());
+		return response(entry);
+	}
+
+	/** The Entry as it stands in its start month. */
+	private EntryResponse response(Entry entry) {
+		return EntryResponse.from(entry, entry.getStartMonth(),
+				this.paymentService.paidIn(entry.getStartMonth()).apply(entry));
 	}
 
 	/** An Expense is paid out of an Account; Income lands outside the app, so it has none. */
@@ -113,9 +122,10 @@ public class EntryService {
 		BigDecimal totalIncome = total(entries, EntryType.INCOME, month);
 		BigDecimal totalExpenses = total(entries, EntryType.EXPENSE, month);
 		PotMonth pots = this.potService.monthOf(month);
+		Function<Entry, Boolean> paid = this.paymentService.paidIn(month);
 		return new MonthSummaryResponse(month,
-				entries.stream().map((entry) -> EntryResponse.from(entry, month)).toList(), totalIncome,
-				totalExpenses, totalIncome.subtract(totalExpenses), transfers(entries, month),
+				entries.stream().map((entry) -> EntryResponse.from(entry, month, paid.apply(entry))).toList(),
+				totalIncome, totalExpenses, totalIncome.subtract(totalExpenses), transfers(entries, month, paid),
 				expensesByCategory(entries, month), pots.pots(), pots.allocation());
 	}
 
@@ -162,13 +172,18 @@ public class EntryService {
 			.getKey();
 	}
 
-	/** One Transfer per Account, always: the total of the Expenses paid out of it this month. */
-	private static List<Transfer> transfers(List<Entry> entries, YearMonth month) {
-		return Arrays.stream(Account.values())
-			.map((account) -> new Transfer(account,
-					total(entries.stream().filter((entry) -> entry.getAccount() == account).toList(),
-							EntryType.EXPENSE, month)))
-			.toList();
+	/**
+	 * One Transfer per Account, always: the total of the Expenses paid out of it this month, and for
+	 * an Account whose Payments are tracked, how much of that isn't paid yet.
+	 */
+	private static List<Transfer> transfers(List<Entry> entries, YearMonth month, Function<Entry, Boolean> paid) {
+		return Arrays.stream(Account.values()).map((account) -> {
+			List<Entry> out = entries.stream().filter((entry) -> entry.getAccount() == account).toList();
+			BigDecimal left = account.tracksPayments() ? total(
+					out.stream().filter((entry) -> !Boolean.TRUE.equals(paid.apply(entry))).toList(),
+					EntryType.EXPENSE, month) : null;
+			return new Transfer(account, total(out, EntryType.EXPENSE, month), left);
+		}).toList();
 	}
 
 	private Entry findEntry(Long id) {

@@ -1,5 +1,44 @@
 <section class="card" aria-labelledby="expense-calendar-title">
-  <h2 id="expense-calendar-title">Due this month</h2>
+  <div class="card-header">
+    <h2 id="expense-calendar-title">Due this month</h2>
+    @if (unpaid().length > 0) {
+      <button
+        type="button"
+        class="unpaid-button"
+        aria-controls="unpaid-list"
+        [attr.aria-expanded]="unpaidOpen()"
+        (click)="toggleUnpaid()"
+      >
+        Unpaid <span class="count">{{ unpaid().length }}</span>
+      </button>
+    }
+  </div>
+
+  @if (unpaidOpen() && unpaid().length > 0) {
+    <div class="unpaid" id="unpaid-list">
+      <p class="unpaid-summary">{{ unpaidTotal() | currency: 'EUR' }} due and not ticked off yet</p>
+      <ul>
+        @for (entry of unpaid(); track entry.id) {
+          <li>
+            <label class="tick">
+              <input
+                type="checkbox"
+                [checked]="entry.paid"
+                [disabled]="ticking().has(entry.id)"
+                (change)="tick(entry, $event)"
+              />
+              <span class="visually-hidden">Paid: {{ label(entry) }}</span>
+            </label>
+            <button type="button" (click)="edit.emit(entry)">
+              <span class="name"><span class="visually-hidden">Edit </span>{{ label(entry) }}</span>
+              <span class="account">Due {{ ordinal(entry.dueDayInMonth!) }}</span>
+              <span class="amount">{{ entry.amount | currency: 'EUR' }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+    </div>
+  }
 
   <div class="grid">
     @for (weekday of weekdays; track weekday) {
@@ -15,6 +54,7 @@
           class="day due"
           [class.today]="day.today"
           [class.selected]="selected()?.day === day.day"
+          [attr.data-status]="day.status"
           [attr.aria-label]="dayLabel(day)"
           [attr.aria-pressed]="selected()?.day === day.day"
           [attr.aria-current]="day.today ? 'date' : null"
@@ -23,7 +63,24 @@
           (click)="select(day.day)"
         >
           <span class="number">{{ day.day }}</span>
-          <span class="dot" aria-hidden="true"></span>
+          @if (day.status === 'paid') {
+            <svg
+              class="tick-mark"
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          } @else {
+            <span class="dot" aria-hidden="true"></span>
+          }
           <span class="total" aria-hidden="true">{{
             day.total | currency: 'EUR' : 'symbol' : '1.0-0'
           }}</span>
@@ -42,10 +99,8 @@
       <ul>
         @for (entry of day.expenses; track entry.id) {
           <li>
-            <button type="button" (click)="edit.emit(entry)">
-              <span class="name"
-                ><span class="visually-hidden">Edit </span>{{ entry.name ?? entry.category }}</span
-              >
+            <button type="button" [class.paid]="entry.paid" (click)="edit.emit(entry)">
+              <span class="name"><span class="visually-hidden">Edit </span>{{ label(entry) }}</span>
               <span class="account">{{ entry.account ? accountLabel(entry.account) : '' }}</span>
               <span class="amount">{{ entry.amount | currency: 'EUR' }}</span>
             </button>

@@ -41,6 +41,8 @@ function entry(
     potId: null,
     dueDay: null,
     dueDayInMonth: null,
+    // Only AIB Expenses can be ticked; the fake API decides each month's paid state.
+    paid: type === 'EXPENSE' && account === 'AIB' ? false : null,
     createdAt: '2026-11-01T00:00:00Z',
   };
 }
@@ -69,8 +71,15 @@ function summary(
     totalExpenses: total('EXPENSE'),
     remainder: total('INCOME') - total('EXPENSE'),
     transfers: [
-      { account: 'AIB', amount: paidFrom('AIB') },
-      { account: 'REVOLUT', amount: paidFrom('REVOLUT') },
+      {
+        account: 'AIB',
+        amount: paidFrom('AIB'),
+        left: total(
+          'EXPENSE',
+          entries.filter((e) => e.account === 'AIB' && !e.paid),
+        ),
+      },
+      { account: 'REVOLUT', amount: paidFrom('REVOLUT'), left: null },
     ],
     expensesByCategory: Array.from(byCategory, ([category, amount]) => ({ category, amount })).sort(
       (a, b) => b.amount - a.amount,
@@ -99,11 +108,30 @@ class FakeMonthApi {
   savedAllocations: { month: string; request: AllocationRequest }[] = [];
   nextId = 100;
 
+  /** "month:entryId" for each Payment; only this month's count, as the backend does. */
+  payments = new Set<string>();
+  /** The month the fake backend treats as "this month". */
+  today = '2026-11';
+
+  pay(month: string, entryId: number): Observable<void> {
+    this.payments.add(`${month}:${entryId}`);
+    return of(undefined);
+  }
+
+  unpay(month: string, entryId: number): Observable<void> {
+    this.payments.delete(`${month}:${entryId}`);
+    return of(undefined);
+  }
+
   getMonth(month: string): Observable<MonthSummary> {
+    const paid = (e: Entry): boolean | null =>
+      e.paid === null
+        ? null
+        : month < this.today || (month === this.today && this.payments.has(`${month}:${e.id}`));
     return of(
       summary(
         month,
-        this.months[month] ?? [],
+        (this.months[month] ?? []).map((e) => ({ ...e, paid: paid(e) })),
         this.potBalances[month] ?? [],
         this.allocations[month] ?? null,
       ),
@@ -1247,6 +1275,16 @@ describe('MonthPage allocation', () => {
 describe('MonthPage due-day calendar', () => {
   let api: FakeMonthApi;
 
+  // Before November 2026, so its days show no paid or unpaid state; 'MonthPage payments' covers that.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 20, 12, 0));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(() => {
     HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
       this.open = true;
@@ -1358,5 +1396,163 @@ describe('MonthPage due-day calendar', () => {
 
     const today = calendar(page.el).querySelector('[aria-current="date"]')!;
     expect(today.querySelector('.number')!.textContent!.trim()).toBe(String(new Date().getDate()));
+  });
+});
+
+describe('MonthPage payments', () => {
+  let api: FakeMonthApi;
+
+  beforeEach(() => {
+    // 15 November 2026: the 3rd and 15th have arrived, the 20th hasn't.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 15, 12, 0));
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+      this.open = false;
+    };
+    api = new FakeMonthApi();
+    const due = (
+      id: number,
+      name: string,
+      amount: number,
+      day: number | null,
+      account: Account,
+    ) => ({
+      ...entry(id, 'EXPENSE', name, amount, account),
+      dueDay: day,
+      dueDayInMonth: day,
+    });
+    api.months['2026-11'] = [
+      entry(1, 'INCOME', 'Salary', 4000),
+      due(2, 'Mortgage', 1500, 3, 'AIB'),
+      due(3, 'Electricity', 120, 15, 'AIB'),
+      due(4, 'Car insurance', 80, 20, 'AIB'),
+      due(5, 'Netflix', 18, 3, 'REVOLUT'),
+      due(6, 'Bin charges', 30, null, 'AIB'),
+    ];
+    api.months['2026-10'] = api.months['2026-11'].map((e) => ({ ...e, startMonth: '2026-10' }));
+    api.months['2026-12'] = api.months['2026-11'];
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const countdown = (el: HTMLElement) =>
+    el.querySelector('.left-to-go p')?.textContent!.replace(/\s+/g, ' ').trim();
+  const calendar = (el: HTMLElement) => el.querySelector<HTMLElement>('app-expense-calendar')!;
+  const unpaidButton = (el: HTMLElement) =>
+    calendar(el).querySelector<HTMLButtonElement>('.unpaid-button');
+  const unpaidNames = (el: HTMLElement) =>
+    Array.from(calendar(el).querySelectorAll('.unpaid li .name'), (name) =>
+      name.textContent!.replace('Edit ', '').trim(),
+    );
+  const tickFor = (el: HTMLElement, name: string) =>
+    Array.from(el.querySelectorAll<HTMLLabelElement>('section.entries .tick'))
+      .find((label) => label.textContent!.includes(name))!
+      .querySelector<HTMLInputElement>('input')!;
+  const tick = async (page: Awaited<ReturnType<typeof render>>, input: HTMLInputElement) => {
+    input.checked = !input.checked;
+    input.dispatchEvent(new Event('change'));
+    await page.fixture.whenStable();
+  };
+
+  it('count down what is still to go out of AIB as Expenses are ticked off', async () => {
+    const page = await render(api);
+    page.toggle('Expenses')!.click();
+    await page.fixture.whenStable();
+
+    expect(countdown(page.el)).toBe('AIB: €1,730.00 left of €1,730.00');
+    await tick(page, tickFor(page.el, 'Mortgage'));
+
+    expect(api.payments.has('2026-11:2')).toBe(true);
+    expect(countdown(page.el)).toBe('AIB: €230.00 left of €1,730.00');
+    expect(tickFor(page.el, 'Mortgage').checked).toBe(true);
+    expect(tickFor(page.el, 'Mortgage').closest('.entry-row')!.classList).toContain('paid');
+
+    await tick(page, tickFor(page.el, 'Mortgage'));
+    expect(api.payments.size).toBe(0);
+    expect(countdown(page.el)).toBe('AIB: €1,730.00 left of €1,730.00');
+  });
+
+  it('offer a tick on AIB Expenses only, Due Day or not', async () => {
+    const page = await render(api);
+    page.toggle('Expenses')!.click();
+    await page.fixture.whenStable();
+
+    const ticked = page
+      .rows('Expenses')
+      .filter((row) => row.closest('.entry-row')!.querySelector('.tick input'))
+      .map((row) => row.querySelector('.entry-name')!.textContent!.replace('Edit ', '').trim());
+    expect(ticked).toEqual(['Mortgage', 'Electricity', 'Car insurance', 'Bin charges']);
+  });
+
+  it('treat past months as paid and future months as unpaid, with no ticks in either', async () => {
+    const page = await render(api, '2026-10');
+    page.toggle('Expenses')!.click();
+    await page.fixture.whenStable();
+    expect(countdown(page.el)).toBe('AIB: €0.00 left of €1,730.00');
+    expect(page.el.querySelector('section.entries .tick')).toBeNull();
+    expect(unpaidButton(page.el)).toBeNull();
+
+    page.fixture.componentRef.setInput('month', '2026-12');
+    await page.fixture.whenStable();
+    expect(countdown(page.el)).toBe('AIB: €1,730.00 left of €1,730.00');
+    expect(page.el.querySelector('section.entries .tick')).toBeNull();
+    expect(unpaidButton(page.el)).toBeNull();
+  });
+
+  it('list only AIB Expenses whose Due Day has arrived unpaid, and tick them off from there', async () => {
+    const page = await render(api);
+
+    expect(unpaidButton(page.el)!.textContent).toContain('2');
+    expect(unpaidNames(page.el)).toEqual([]);
+    unpaidButton(page.el)!.click();
+    await page.fixture.whenStable();
+    expect(unpaidButton(page.el)!.getAttribute('aria-expanded')).toBe('true');
+    expect(unpaidNames(page.el)).toEqual(['Mortgage', 'Electricity']);
+
+    await tick(page, calendar(page.el).querySelector<HTMLInputElement>('.unpaid li input')!);
+    expect(api.payments.has('2026-11:2')).toBe(true);
+    expect(unpaidNames(page.el)).toEqual(['Electricity']);
+    expect(countdown(page.el)).toBe('AIB: €230.00 left of €1,730.00');
+
+    await tick(page, calendar(page.el).querySelector<HTMLInputElement>('.unpaid li input')!);
+    expect(unpaidButton(page.el)).toBeNull();
+  });
+
+  it('open the edit dialog from the Unpaid list', async () => {
+    const page = await render(api);
+    unpaidButton(page.el)!.click();
+    await page.fixture.whenStable();
+
+    calendar(page.el).querySelector<HTMLButtonElement>('.unpaid li button')!.click();
+    await page.fixture.whenStable();
+    expect(page.el.querySelector<HTMLInputElement>('dialog #entry-amount')!.value).toBe('1500');
+  });
+
+  it('mark days on the calendar as paid or unpaid', async () => {
+    const page = await render(api);
+    const status = () =>
+      Array.from(calendar(page.el).querySelectorAll('button.day'), (day) => [
+        day.querySelector('.number')!.textContent!.trim(),
+        day.getAttribute('data-status'),
+      ]);
+
+    expect(status()).toEqual([
+      ['3', 'unpaid'],
+      ['15', 'unpaid'],
+      ['20', null],
+    ]);
+    unpaidButton(page.el)!.click();
+    await page.fixture.whenStable();
+    await tick(page, calendar(page.el).querySelector<HTMLInputElement>('.unpaid li input')!);
+
+    expect(status()[0]).toEqual(['3', 'paid']);
+    expect(calendar(page.el).querySelector('button.day')!.getAttribute('aria-label')).toBe(
+      'Tuesday 3rd: 2 Expenses, €1,518.00, all paid',
+    );
   });
 });

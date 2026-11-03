@@ -42,6 +42,11 @@ export interface Entry {
   dueDay: number | null;
   /** The Due Day as it falls in the month returned: the 31st is the 30th in November. */
   dueDayInMonth: number | null;
+  /**
+   * Whether an AIB Expense has gone out in the month returned: earlier months are always paid,
+   * later months never; this month it's ticked by hand. Null for anything that can't be ticked.
+   */
+  paid: boolean | null;
   createdAt: string;
 }
 
@@ -92,6 +97,8 @@ export interface CategoryTotal {
 export interface Transfer {
   account: Account;
   amount: number;
+  /** How much of `amount` is still to go out: the Expenses not paid yet. Null when untracked (Revolut). */
+  left: number | null;
 }
 
 export type PotKind = 'SAVINGS' | 'LOAN' | 'OVERDRAFT' | 'CREDIT_CARD';

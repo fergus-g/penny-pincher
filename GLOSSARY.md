@@ -38,6 +38,14 @@ _Avoid_: Weekly amount, per-week cost
 Total Income minus total Expenses for a month. Shown to users as "Left over this month".
 _Avoid_: Balance, left over, surplus
 
+**Payment**:
+A record that an AIB Expense has gone out in a given month, ticked by hand after checking the bank. Only the current month can be ticked; earlier months count as fully paid and later months as unpaid (ADR 0003).
+_Avoid_: Paid flag, settled, cleared
+
+**Unpaid**:
+An AIB Expense in the current month whose Due Day has arrived but has no Payment yet. Expenses with no Due Day are never Unpaid; they can still be ticked from the Expenses list.
+_Avoid_: Overdue, outstanding, missed
+
 ### Allocation
 
 **Allocation**:
