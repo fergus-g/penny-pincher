@@ -36,3 +36,17 @@ export function paydayWeeks(month: string): number {
     86_400_000;
   return Math.round(days / 7);
 }
+
+/** The next payday on or after `today`: this month's last Thursday, or next month's once it's gone. */
+export function nextPayday(today: Date): Date {
+  const day = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const thisMonth = payday(day.getFullYear(), day.getMonth());
+  return day <= thisMonth ? thisMonth : payday(day.getFullYear(), day.getMonth() + 1);
+}
+
+/** Whole days from `today` to the next payday: 0 on payday itself. */
+export function daysToPayday(today: Date): number {
+  const day = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  // Rounded, so a clock change between the two dates doesn't leave a fraction of a day.
+  return Math.round((nextPayday(today).getTime() - day.getTime()) / 86_400_000);
+}
