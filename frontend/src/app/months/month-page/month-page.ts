@@ -33,6 +33,7 @@ import {
   potKindLabel,
 } from '../month.model';
 import { isCurrentMonth, isTickable } from '../payments';
+import { PaydayCountdown } from '../payday-countdown/payday-countdown';
 import { PotForm } from '../pot-form/pot-form';
 
 /** The current month as "yyyy-MM". */
@@ -109,6 +110,7 @@ const RECENT_CATEGORIES = 6;
     EntryForm,
     ExpenseCalendar,
     ExpenseChart,
+    PaydayCountdown,
     PotForm,
   ],
   selector: 'app-month-page',

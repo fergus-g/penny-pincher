@@ -1,0 +1,31 @@
+:host {
+  display: block;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card);
+}
+
+p {
+  margin: 0;
+}
+
+.headline {
+  font-size: 16px;
+  font-weight: 600;
+
+  strong {
+    font-size: 22px;
+  }
+}
+
+.date {
+  color: var(--muted);
+  font-size: 13px;
+}
