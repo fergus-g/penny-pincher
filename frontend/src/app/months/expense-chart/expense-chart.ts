@@ -83,6 +83,9 @@ export class ExpenseChart {
   protected readonly options: ChartConfiguration<'pie'>['options'] = {
     maintainAspectRatio: false,
     plugins: {
+      // Chart.js plugins are registered globally, so once the Trends page has loaded its Legend,
+      // the pie would grow one too. Its categories are listed in the details dialog instead.
+      legend: { display: false },
       tooltip: {
         callbacks: {
           label: (item) => {
