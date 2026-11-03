@@ -404,6 +404,87 @@ main {
   }
 }
 
+/* Savings goals card: one progress bar per Savings Pot with a Target. */
+.goals {
+  padding: 20px 32px;
+
+  h2 {
+    margin: 0 0 12px;
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  ul {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .goal-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+
+  .goal-name {
+    min-height: 32px;
+    padding: 0;
+    border: none;
+    background: none;
+    font-size: 15px;
+    font-weight: 500;
+    text-align: left;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .goal-figures {
+    color: var(--muted);
+    font-size: 14px;
+    white-space: nowrap;
+
+    strong {
+      color: var(--text);
+      font-size: 16px;
+    }
+  }
+
+  .bar {
+    height: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #eef1f5;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: #1a7f4b;
+  }
+
+  .goal-meta {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+
+    strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .done {
+      color: #1a7f4b;
+    }
+  }
+}
+
 .warning,
 .paid-off {
   margin: 0 0 16px;
@@ -820,7 +901,9 @@ dialog {
     font-size: 36px;
   }
 
-  .transfers {
+  .transfers,
+  .allocation,
+  .goals {
     padding: 16px 20px;
   }
 

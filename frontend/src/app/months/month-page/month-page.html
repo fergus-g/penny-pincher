@@ -251,6 +251,65 @@
           }
         </section>
 
+        <section class="card goals" aria-labelledby="goals-title">
+          <h2 id="goals-title">Savings goals</h2>
+          @if (goals().goals.length > 0) {
+            <ul>
+              @for (goal of goals().goals; track goal.pot.id) {
+                <li>
+                  <div class="goal-top">
+                    <button type="button" class="goal-name" (click)="openEditPot(goal.pot.id)">
+                      <span class="visually-hidden">Edit </span>{{ goal.pot.name }}
+                    </button>
+                    <span class="goal-figures">
+                      <strong>{{ goal.saved | currency: 'EUR' : 'symbol' : '1.0-0' }}</strong> of
+                      {{ goal.target | currency: 'EUR' : 'symbol' : '1.0-0' }}
+                    </span>
+                  </div>
+                  <div
+                    class="bar"
+                    role="progressbar"
+                    [attr.aria-label]="goal.pot.name + ' saved'"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    [attr.aria-valuenow]="goal.percent"
+                  >
+                    <div class="bar-fill" [style.width.%]="goal.percent"></div>
+                  </div>
+                  <p class="goal-meta">
+                    @if (goal.reached) {
+                      <strong class="done">Target reached</strong>
+                    } @else if (goal.reachedIn) {
+                      {{ goal.togo | currency: 'EUR' : 'symbol' : '1.0-0' }} to go at
+                      {{ goal.monthly | currency: 'EUR' : 'symbol' : '1.0-2' }}/month{{
+                        goal.monthlyEdited ? ' (set by hand)' : ''
+                      }}
+                      · <strong>reached {{ goal.reachedIn }}</strong>
+                    } @else {
+                      {{ goal.togo | currency: 'EUR' : 'symbol' : '1.0-0' }} to go · No date:
+                      nothing going in
+                    }
+                  </p>
+                </li>
+              }
+            </ul>
+          } @else {
+            <div class="setup">
+              @if (goals().setup; as pot) {
+                <p>
+                  Give a Savings Pot a Target to see how close you are and when you'll get there.
+                </p>
+                <button type="button" class="add-button" (click)="openEditPot(pot.id)">
+                  Set a target
+                </button>
+              } @else {
+                <p>Add a Savings Pot with a Target to track it here.</p>
+                <button type="button" class="add-button" (click)="openAddPot()">+ Pot</button>
+              }
+            </div>
+          }
+        </section>
+
         <div class="sections">
           @for (section of sections(); track section.type) {
             <section

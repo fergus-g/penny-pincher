@@ -1714,3 +1714,121 @@ describe('MonthPage header', () => {
     expect(link!.getAttribute('href')).toBe('/trends');
   });
 });
+
+describe('MonthPage savings goals', () => {
+  let api: FakeMonthApi;
+
+  const savings = (
+    id: number,
+    name: string,
+    balance: number,
+    projection: PotBalance['projection'],
+  ): PotBalance => ({
+    id,
+    name,
+    kind: 'SAVINGS',
+    account: 'AIB',
+    balance,
+    checkedIn: false,
+    projection,
+  });
+
+  beforeEach(() => {
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+      this.open = false;
+    };
+    api = new FakeMonthApi();
+  });
+
+  const card = (el: HTMLElement) => el.querySelector<HTMLElement>('section.goals')!;
+  const goals = (el: HTMLElement) =>
+    Array.from(card(el).querySelectorAll('li'), (li) =>
+      li.textContent!.replace(/\s+/g, ' ').trim(),
+    );
+
+  it('sit right under the Allocation', async () => {
+    const { el } = await render(api);
+    expect(el.querySelector('section.allocation')!.nextElementSibling!.classList).toContain(
+      'goals',
+    );
+  });
+
+  it('show each target, what is saved so far and when it gets there', async () => {
+    api.potBalances['2026-11'] = [
+      savings(1, 'Holiday', 1400, {
+        target: 5000,
+        monthly: 300,
+        monthlyEdited: false,
+        reached: false,
+        reachedIn: '2027-11',
+      }),
+      savings(2, 'Rainy day', 800, null),
+      savings(3, 'Laptop', 900, {
+        target: 800,
+        monthly: 0,
+        monthlyEdited: false,
+        reached: true,
+        reachedIn: null,
+      }),
+      savings(4, 'Car', 100, {
+        target: 2000,
+        monthly: 50,
+        monthlyEdited: true,
+        reached: false,
+        reachedIn: '2029-12',
+      }),
+      {
+        ...savings(5, 'Loan', 3000, {
+          target: 0,
+          monthly: 150,
+          monthlyEdited: false,
+          reached: false,
+          reachedIn: '2028-10',
+        }),
+        kind: 'LOAN',
+      },
+    ];
+    const { el } = await render(api);
+
+    expect(goals(el)).toEqual([
+      'Edit Holiday €1,400 of €5,000 €3,600 to go at €300/month · reached November 2027',
+      'Edit Laptop €900 of €800 Target reached',
+      'Edit Car €100 of €2,000 €1,900 to go at €50/month (set by hand) · reached December 2029',
+    ]);
+    expect(
+      Array.from(card(el).querySelectorAll('[role="progressbar"]'), (bar) =>
+        bar.getAttribute('aria-valuenow'),
+      ),
+    ).toEqual(['28', '100', '5']);
+  });
+
+  it('prompt for a target on an existing Savings Pot, or for a Savings Pot when there is none', async () => {
+    api.pots = [
+      {
+        id: 2,
+        name: 'Rainy day',
+        kind: 'SAVINGS',
+        account: 'AIB',
+        openingBalance: 800,
+        openingMonth: '2026-01',
+        archivedFrom: null,
+        target: null,
+        monthlyAmount: null,
+      },
+    ];
+    api.potBalances['2026-11'] = [savings(2, 'Rainy day', 800, null)];
+    const page = await render(api);
+    card(page.el).querySelector<HTMLButtonElement>('.setup button')!.click();
+    await page.fixture.whenStable();
+    expect(page.el.querySelector<HTMLInputElement>('dialog #pot-name')!.value).toBe('Rainy day');
+
+    const empty = await (async () => {
+      TestBed.resetTestingModule();
+      return render(new FakeMonthApi());
+    })();
+    expect(card(empty.el).querySelector('.setup button')!.textContent).toContain('+ Pot');
+  });
+});

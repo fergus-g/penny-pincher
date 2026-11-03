@@ -267,6 +267,32 @@ export class MonthPage {
     })),
   );
 
+  /**
+   * Savings Pots with a Target: how far along each is and when it gets there. `setup` says what
+   * the empty card offers: a Savings Pot to give a Target, or none yet to add one.
+   */
+  protected readonly goals = computed(() => {
+    const pots = this.summary.hasValue() ? this.summary.value().pots : [];
+    const savings = pots.filter((pot) => !isDebt(pot.kind));
+    const goals = savings
+      .filter((pot) => pot.projection !== null)
+      .map((pot) => {
+        const projection = pot.projection!;
+        return {
+          pot,
+          target: projection.target,
+          saved: pot.balance,
+          percent: Math.min(100, Math.round((pot.balance / projection.target) * 100)),
+          togo: Math.max(0, projection.target - pot.balance),
+          monthly: projection.monthly,
+          monthlyEdited: projection.monthlyEdited,
+          reached: projection.reached,
+          reachedIn: projection.reachedIn ? monthLabel(projection.reachedIn) : null,
+        };
+      });
+    return { goals, setup: savings.find((pot) => pot.projection === null) ?? null };
+  });
+
   /** This month's Allocation, worded for display; null before the first Allocation starts. */
   protected readonly allocation = computed(() => {
     const month = this.summary.hasValue() ? this.summary.value() : null;
