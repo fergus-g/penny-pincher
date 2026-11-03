@@ -21,6 +21,15 @@ export function accountLabel(account: Account): string {
   return ACCOUNTS.find((option) => option.value === account)!.label;
 }
 
+/**
+ * Food and groceries are always needed, so an Expense in any category mentioning them recurs every
+ * month and can't be one-off. The backend applies the same rule.
+ */
+export function isAlwaysRecurring(type: EntryType, category: string): boolean {
+  const key = category.toLowerCase();
+  return type === 'EXPENSE' && (key.includes('food') || key.includes('grocer'));
+}
+
 export interface Entry {
   id: number;
   type: EntryType;

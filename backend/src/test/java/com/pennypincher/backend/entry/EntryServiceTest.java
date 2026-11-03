@@ -349,6 +349,26 @@ class EntryServiceTest {
 	}
 
 	@Test
+	void foodAndGroceriesAreNeverOneOff() {
+		given(this.entryRepository.save(any(Entry.class))).willAnswer((invocation) -> invocation.getArgument(0));
+		EntryResponse created = this.entryService.create(new CreateEntryRequest(EntryType.EXPENSE, "Food & Groceries",
+				null, null, new BigDecimal("180.00"), Account.REVOLUT, OCT, true, null, null));
+		assertThat(created.endMonth()).isNull();
+		Entry groceries = expense("Groceries", "400.00");
+		given(this.entryRepository.findById(1L)).willReturn(Optional.of(groceries));
+		EntryResponse updated = this.entryService.update(1L, new UpdateEntryRequest("Groceries", null,
+				new BigDecimal("400.00"), null, Account.AIB, true, null, null));
+		assertThat(updated.endMonth()).isNull();
+	}
+
+	@Test
+	void otherExpensesCanStillBeOneOff() {
+		assertThat(Entry.isAlwaysRecurring(EntryType.EXPENSE, "Tech")).isFalse();
+		assertThat(Entry.isAlwaysRecurring(EntryType.INCOME, "Food")).isFalse();
+		assertThat(Entry.isAlwaysRecurring(EntryType.EXPENSE, " FOOD ")).isTrue();
+	}
+
+	@Test
 	void getCategoriesMergesVariantsAlphabetically() {
 		given(this.entryRepository.findCategories(EntryType.EXPENSE))
 			.willReturn(List.of("transport", "Groceries", "groceries ", "Groceries", "Housing", "Transport "));
