@@ -187,6 +187,91 @@ class MonthLedgerTest {
 		return potBalance(pot, month).balance();
 	}
 
+	// Projections
+
+	@Test
+	void aSavingsPotWithNoTargetHasNoProjection() {
+		Pot savings = pot(1L, PotKind.SAVINGS, "100.00", JAN, Account.AIB);
+		contribution(savings, "50.00", JAN, null);
+		assertThat(potBalance(savings, FEB).projection()).isNull();
+	}
+
+	@Test
+	void theAllocationsSavingsPotProjectsFromContributionsPlusSavings() {
+		Pot savings = pot(1L, PotKind.SAVINGS, "1000.00", JAN, Account.AIB);
+		savings.setTarget(new BigDecimal("2000.00"));
+		contribution(savings, "100.00", JAN, null);
+		allocate(JAN, "150.00", "0.00", savings, null);
+		income("5000.00");
+		Projection projection = potBalance(savings, JAN).projection();
+		assertThat(projection.monthly()).isEqualByComparingTo("250.00");
+		assertThat(projection.monthlyEdited()).isFalse();
+		// €1,000 to go at €250 a month: four months after January.
+		assertThat(projection.reachedIn()).isEqualTo(YearMonth.of(2026, 5));
+	}
+
+	@Test
+	void anEditedMonthlyAmountReplacesContributionsAndSavings() {
+		Pot savings = pot(1L, PotKind.SAVINGS, "1000.00", JAN, Account.AIB);
+		savings.setTarget(new BigDecimal("2000.00"));
+		savings.setMonthlyAmount(new BigDecimal("400.00"));
+		contribution(savings, "100.00", JAN, null);
+		allocate(JAN, "150.00", "0.00", savings, null);
+		income("5000.00");
+		Projection projection = potBalance(savings, JAN).projection();
+		assertThat(projection.monthly()).isEqualByComparingTo("400.00");
+		assertThat(projection.monthlyEdited()).isTrue();
+		// €1,000 at €400: three months, the last one part-paid.
+		assertThat(projection.reachedIn()).isEqualTo(APR);
+	}
+
+	@Test
+	void changingTheAllocationsSavingsMovesTheDate() {
+		Pot savings = pot(1L, PotKind.SAVINGS, "0.00", JAN, Account.AIB);
+		savings.setTarget(new BigDecimal("1200.00"));
+		allocate(JAN, "100.00", "0.00", savings, null);
+		allocate(MAR, "300.00", "0.00", savings, null);
+		income("5000.00");
+		// €100 saved by the end of February: €1,100 to go at €100.
+		assertThat(potBalance(savings, FEB).projection().reachedIn()).isEqualTo(YearMonth.of(2027, 1));
+		// Then €300 in March: €800 to go at €300.
+		assertThat(potBalance(savings, MAR).projection().reachedIn()).isEqualTo(YearMonth.of(2026, 6));
+	}
+
+	@Test
+	void aDebtPotProjectsFromContributionsOnly() {
+		Pot loan = pot(1L, PotKind.LOAN, "1000.00", JAN, Account.AIB);
+		contribution(loan, "150.00", JAN, null);
+		allocate(JAN, "0.00", "0.00", null, loan);
+		income("5000.00");
+		Projection projection = potBalance(loan, JAN).projection();
+		assertThat(projection.target()).isZero();
+		assertThat(projection.monthly()).isEqualByComparingTo("150.00");
+		// €1,000 at €150 a month: seven months, the last one part-paid.
+		assertThat(projection.reachedIn()).isEqualTo(YearMonth.of(2026, 8));
+	}
+
+	@Test
+	void aPotWithNothingGoingInHasNoDate() {
+		Pot loan = pot(1L, PotKind.LOAN, "1000.00", JAN, Account.AIB);
+		Projection projection = potBalance(loan, JAN).projection();
+		assertThat(projection.reached()).isFalse();
+		assertThat(projection.reachedIn()).isNull();
+	}
+
+	@Test
+	void aTargetAlreadyReachedShowsAsReached() {
+		Pot savings = pot(1L, PotKind.SAVINGS, "3000.00", JAN, Account.AIB);
+		savings.setTarget(new BigDecimal("2000.00"));
+		Projection projection = potBalance(savings, JAN).projection();
+		assertThat(projection.reached()).isTrue();
+		assertThat(projection.reachedIn()).isNull();
+	}
+
+	private void income(String amount) {
+		this.entries.add(new Entry(EntryType.INCOME, "Salary", null, new BigDecimal(amount), null, JAN, null));
+	}
+
 	private PotBalance potBalance(Pot pot, YearMonth month) {
 		return MonthLedger.run(month, this.pots, this.checkIns, this.entries, this.allocations)
 			.pots()

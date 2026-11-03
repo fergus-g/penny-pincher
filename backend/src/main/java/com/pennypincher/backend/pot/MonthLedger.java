@@ -59,20 +59,44 @@ final class MonthLedger {
 			}
 			split = allocate(current, entries, allocations, running);
 		}
+		Allocation allocation = inForce(month, allocations).orElse(null);
 		List<PotBalance> balances = running.values()
 			.stream()
 			.filter((pot) -> pot.pot.isActiveIn(month))
-			.map(Running::toBalance)
+			.map((pot) -> pot.toBalance(projection(pot, month, entries, allocation)))
 			.toList();
 		return new PotMonth(balances, (split != null) ? split.summary(pots, running) : null);
+	}
+
+	/**
+	 * When the Pot reaches its target, going on as {@code month} does: its Contributions that month,
+	 * plus the Allocation's Savings if it's the Allocation's Savings Pot. A Savings Pot's monthly
+	 * amount set by hand replaces both. Debt Repayment isn't counted.
+	 */
+	private static Projection projection(Running pot, YearMonth month, List<Entry> entries, Allocation allocation) {
+		BigDecimal edited = pot.pot.getKind().isDebt() ? null : pot.pot.getMonthlyAmount();
+		BigDecimal monthly = edited;
+		if (monthly == null) {
+			monthly = contributions(pot.pot, entries, month);
+			if (!pot.pot.getKind().isDebt() && allocation != null
+					&& pot.pot.getId().equals(allocation.getSavingsPotId())) {
+				monthly = monthly.add(allocation.getSavings());
+			}
+		}
+		return Projection.of(pot.pot.getKind(), pot.balance, pot.pot.getTarget(), monthly, edited != null, month);
+	}
+
+	/** The Allocation in force in {@code month}: the latest to start by then. */
+	private static Optional<Allocation> inForce(YearMonth month, List<Allocation> allocations) {
+		return allocations.stream()
+			.filter((allocation) -> !allocation.getEffectiveFrom().isAfter(month))
+			.reduce((earlier, later) -> later);
 	}
 
 	/** Applies the month's Allocation to the Pots it targets; null with no Allocation in force. */
 	private static Split allocate(YearMonth month, List<Entry> entries, List<Allocation> allocations,
 			Map<Long, Running> running) {
-		Optional<Allocation> inForce = allocations.stream()
-			.filter((allocation) -> !allocation.getEffectiveFrom().isAfter(month))
-			.reduce((earlier, later) -> later);
+		Optional<Allocation> inForce = inForce(month, allocations);
 		if (inForce.isEmpty()) {
 			return null;
 		}
@@ -180,9 +204,9 @@ final class MonthLedger {
 			return taken;
 		}
 
-		PotBalance toBalance() {
+		PotBalance toBalance(Projection projection) {
 			return new PotBalance(this.pot.getId(), this.pot.getName(), this.pot.getKind(), this.pot.getAccount(),
-					this.balance, this.checkedIn);
+					this.balance, this.checkedIn, projection);
 		}
 
 	}

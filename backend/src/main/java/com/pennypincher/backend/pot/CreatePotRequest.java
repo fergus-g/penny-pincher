@@ -6,6 +6,7 @@ import java.time.YearMonth;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
@@ -13,12 +14,16 @@ import com.pennypincher.backend.entry.Account;
 
 /**
  * Body of {@code POST /api/pots}. {@code openingBalance} is the amount saved or owed at the end
- * of {@code openingMonth}, always positive.
+ * of {@code openingMonth}, always positive. {@code target} and {@code monthlyAmount} are for a
+ * Savings Pot only: its target, and a monthly amount set by hand (null to follow its
+ * Contributions and the Allocation).
  */
 public record CreatePotRequest(
 		@NotBlank @Size(max = 50) String name,
 		@NotNull PotKind kind,
 		@NotNull Account account,
 		@NotNull @PositiveOrZero @Digits(integer = 10, fraction = 2) BigDecimal openingBalance,
-		@NotNull YearMonth openingMonth) {
+		@NotNull YearMonth openingMonth,
+		@Positive @Digits(integer = 10, fraction = 2) BigDecimal target,
+		@PositiveOrZero @Digits(integer = 10, fraction = 2) BigDecimal monthlyAmount) {
 }

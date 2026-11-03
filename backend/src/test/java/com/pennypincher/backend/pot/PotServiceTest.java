@@ -85,10 +85,34 @@ class PotServiceTest {
 	@Test
 	void archivingBeforeTheOpeningMonthIsRejected() {
 		given(this.potRepository.findById(1L)).willReturn(Optional.of(pot(PotKind.SAVINGS, "10.00", FEB)));
-		UpdatePotRequest request = new UpdatePotRequest("Pot", Account.AIB, BigDecimal.TEN, FEB, JAN);
+		UpdatePotRequest request = new UpdatePotRequest("Pot", Account.AIB, BigDecimal.TEN, FEB, JAN, null, null);
 		assertThatThrownBy(() -> this.potService.update(1L, request)).isInstanceOfSatisfying(
 				ResponseStatusException.class,
 				(ex) -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+	}
+
+	@Test
+	void aDebtPotCannotHaveATargetOrMonthlyAmount() {
+		given(this.potRepository.findById(1L)).willReturn(Optional.of(pot(PotKind.LOAN, "10.00", FEB)));
+		UpdatePotRequest withTarget = new UpdatePotRequest("Pot", Account.AIB, BigDecimal.TEN, FEB, null,
+				new BigDecimal("100.00"), null);
+		assertThatThrownBy(() -> this.potService.update(1L, withTarget)).isInstanceOfSatisfying(
+				ResponseStatusException.class,
+				(ex) -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+		CreatePotRequest withMonthly = new CreatePotRequest("Pot", PotKind.CREDIT_CARD, Account.AIB, BigDecimal.TEN,
+				FEB, null, new BigDecimal("50.00"));
+		assertThatThrownBy(() -> this.potService.create(withMonthly)).isInstanceOfSatisfying(
+				ResponseStatusException.class,
+				(ex) -> assertThat(ex.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST));
+	}
+
+	@Test
+	void aSavingsPotKeepsItsTargetAndMonthlyAmount() {
+		given(this.potRepository.findById(1L)).willReturn(Optional.of(pot(PotKind.SAVINGS, "10.00", FEB)));
+		PotResponse response = this.potService.update(1L, new UpdatePotRequest("Pot", Account.AIB, BigDecimal.TEN,
+				FEB, null, new BigDecimal("5000.00"), new BigDecimal("250.00")));
+		assertThat(response.target()).isEqualByComparingTo("5000.00");
+		assertThat(response.monthlyAmount()).isEqualByComparingTo("250.00");
 	}
 
 	@Test
