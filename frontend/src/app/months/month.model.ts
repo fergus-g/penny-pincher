@@ -130,6 +130,10 @@ export interface Pot {
   openingMonth: string;
   /** Hidden from this month onwards; null while in use. */
   archivedFrom: string | null;
+  /** A Savings Pot's target; null for none, and always for a debt. */
+  target: number | null;
+  /** A Savings Pot's monthly amount set by hand; null to follow its Contributions and the Allocation. */
+  monthlyAmount: number | null;
 }
 
 /** Body of PUT /api/pots/{id}. The kind can't change after creation. */
@@ -139,6 +143,10 @@ export interface UpdatePotRequest {
   openingBalance: number;
   openingMonth: string;
   archivedFrom: string | null;
+  /** Savings Pots only; always null for a debt. */
+  target: number | null;
+  /** Savings Pots only; null follows its Contributions and the Allocation. */
+  monthlyAmount: number | null;
 }
 
 /** Body of POST /api/pots. */
@@ -148,6 +156,10 @@ export interface CreatePotRequest {
   account: Account;
   openingBalance: number;
   openingMonth: string;
+  /** Savings Pots only; always null for a debt. */
+  target: number | null;
+  /** Savings Pots only; null follows its Contributions and the Allocation. */
+  monthlyAmount: number | null;
 }
 
 /** A Pot's balance at the end of one month: positive, even for a debt. */
@@ -159,6 +171,25 @@ export interface PotBalance {
   balance: number;
   /** True when this month has a Balance Check-in rather than a calculated balance. */
   checkedIn: boolean;
+  /** When it reaches its target from this month on; null for a Savings Pot with no target. */
+  projection: Projection | null;
+}
+
+/**
+ * When a Pot reaches its target at its monthly amount: a Savings Pot its target, a debt zero. An
+ * estimate: interest is ignored.
+ */
+export interface Projection {
+  /** A Savings Pot's target; 0 for a debt. */
+  target: number;
+  /** What goes in (or pays it down) each month. */
+  monthly: number;
+  /** True when `monthly` was set by hand rather than following Contributions and the Allocation. */
+  monthlyEdited: boolean;
+  /** The balance has already reached the target. */
+  reached: boolean;
+  /** The month it gets there; null when already reached or nothing goes in. */
+  reachedIn: string | null;
 }
 
 /** One month's split of the Remainder. A null Pot means that share is unassigned. */

@@ -395,6 +395,11 @@
                     <span class="badge checked-in">Checked in</span>
                   }
                 </span>
+                @if (row.projection; as projection) {
+                  <span class="projection" title="An estimate: interest is ignored">{{
+                    projection
+                  }}</span>
+                }
               </button>
               <span class="amount" [class.negative]="row.shown < 0">{{
                 row.shown | currency: 'EUR'

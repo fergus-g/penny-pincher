@@ -148,7 +148,7 @@ class FakeMonthApi {
     const { id, name, kind, account, openingBalance } = pot;
     this.potBalances[request.openingMonth] = [
       ...(this.potBalances[request.openingMonth] ?? []),
-      { id, name, kind, account, balance: openingBalance, checkedIn: false },
+      { id, name, kind, account, balance: openingBalance, checkedIn: false, projection: null },
     ];
     return of(pot);
   }
@@ -878,6 +878,8 @@ describe('MonthPage pots', () => {
         openingBalance: 5000,
         openingMonth: '2026-01',
         archivedFrom: null,
+        target: null,
+        monthlyAmount: null,
       },
       {
         id: 2,
@@ -887,10 +889,20 @@ describe('MonthPage pots', () => {
         openingBalance: 1200,
         openingMonth: '2026-01',
         archivedFrom: null,
+        target: null,
+        monthlyAmount: null,
       },
     ];
     api.potBalances['2026-11'] = [
-      { id: 1, name: 'Car loan', kind: 'LOAN', account: 'AIB', balance: 4750, checkedIn: false },
+      {
+        id: 1,
+        name: 'Car loan',
+        kind: 'LOAN',
+        account: 'AIB',
+        balance: 4750,
+        checkedIn: false,
+        projection: null,
+      },
       {
         id: 2,
         name: 'Rainy day',
@@ -898,6 +910,7 @@ describe('MonthPage pots', () => {
         account: 'REVOLUT',
         balance: 1300,
         checkedIn: true,
+        projection: null,
       },
     ];
   });
@@ -1064,6 +1077,8 @@ describe('MonthPage allocation', () => {
         openingBalance: 5000,
         openingMonth: '2026-01',
         archivedFrom: null,
+        target: null,
+        monthlyAmount: null,
       },
       {
         id: 2,
@@ -1073,6 +1088,8 @@ describe('MonthPage allocation', () => {
         openingBalance: 0,
         openingMonth: '2026-01',
         archivedFrom: null,
+        target: null,
+        monthlyAmount: null,
       },
     ];
   });
@@ -1554,5 +1571,136 @@ describe('MonthPage payments', () => {
     expect(calendar(page.el).querySelector('button.day')!.getAttribute('aria-label')).toBe(
       'Tuesday 3rd: 2 Expenses, €1,518.00, all paid',
     );
+  });
+});
+
+describe('MonthPage projections', () => {
+  let api: FakeMonthApi;
+
+  const pot = (id: number, name: string, kind: Pot['kind'], target: number | null): Pot => ({
+    id,
+    name,
+    kind,
+    account: 'AIB',
+    openingBalance: 1000,
+    openingMonth: '2026-01',
+    archivedFrom: null,
+    target,
+    monthlyAmount: null,
+  });
+  const balance = (p: Pot, projection: PotBalance['projection']): PotBalance => ({
+    id: p.id,
+    name: p.name,
+    kind: p.kind,
+    account: p.account,
+    balance: 1000,
+    checkedIn: false,
+    projection,
+  });
+
+  beforeEach(() => {
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+      this.open = false;
+    };
+    api = new FakeMonthApi();
+  });
+
+  const projections = (el: HTMLElement) =>
+    Array.from(
+      el.querySelectorAll('section.pots .pot'),
+      (row) => row.querySelector('.projection')?.textContent!.trim() ?? null,
+    );
+  function fill(el: HTMLElement, values: Record<string, string>) {
+    for (const [id, value] of Object.entries(values)) {
+      const field = el.querySelector<HTMLInputElement | HTMLSelectElement>(`dialog #${id}`)!;
+      field.value = value;
+      field.dispatchEvent(new Event(field.tagName === 'SELECT' ? 'change' : 'input'));
+    }
+  }
+
+  it('show where each Pot is heading, and nothing for savings with no target', async () => {
+    const holiday = pot(1, 'Holiday', 'SAVINGS', 5000);
+    const loan = pot(2, 'Car loan', 'LOAN', null);
+    const rainy = pot(3, 'Rainy day', 'SAVINGS', null);
+    const card = pot(4, 'Credit card', 'CREDIT_CARD', null);
+    const done = pot(5, 'Laptop', 'SAVINGS', 800);
+    api.pots = [holiday, loan, rainy, card, done];
+    api.potBalances['2026-11'] = [
+      balance(holiday, {
+        target: 5000,
+        monthly: 200,
+        monthlyEdited: false,
+        reached: false,
+        reachedIn: '2027-06',
+      }),
+      balance(loan, {
+        target: 0,
+        monthly: 150.5,
+        monthlyEdited: false,
+        reached: false,
+        reachedIn: '2028-03',
+      }),
+      balance(rainy, null),
+      balance(card, {
+        target: 0,
+        monthly: 0,
+        monthlyEdited: false,
+        reached: false,
+        reachedIn: null,
+      }),
+      balance(done, {
+        target: 800,
+        monthly: 0,
+        monthlyEdited: false,
+        reached: true,
+        reachedIn: null,
+      }),
+    ];
+    const { el } = await render(api);
+
+    expect(projections(el)).toEqual([
+      'Target €5,000 · €200/month · reached Jun 2027',
+      '€150.50/month · debt-free Mar 2028',
+      null,
+      'No date: nothing going in',
+      'Target €800 reached',
+    ]);
+  });
+
+  it('save a target and monthly amount on a Savings Pot, and reset it to follow the Allocation', async () => {
+    api.pots = [{ ...pot(1, 'Holiday', 'SAVINGS', 5000), monthlyAmount: 250 }];
+    api.potBalances['2026-11'] = [balance(api.pots[0], null)];
+    const page = await render(api);
+
+    page.el.querySelector<HTMLButtonElement>('section.pots .pot-main')!.click();
+    await page.fixture.whenStable();
+    expect(page.el.querySelector<HTMLInputElement>('dialog #pot-target')!.value).toBe('5000');
+    expect(page.el.querySelector<HTMLInputElement>('dialog #pot-monthly')!.value).toBe('250');
+    fill(page.el, { 'pot-target': '6000' });
+    page.el.querySelector<HTMLButtonElement>('dialog .link-button')!.click();
+    await page.fixture.whenStable();
+    expect(page.el.querySelector<HTMLInputElement>('dialog #pot-monthly')!.value).toBe('');
+    page.el.querySelector('dialog form')!.dispatchEvent(new Event('submit'));
+    await page.fixture.whenStable();
+
+    expect(api.pots[0]).toMatchObject({ target: 6000, monthlyAmount: null });
+  });
+
+  it('offer no target or monthly amount on a debt', async () => {
+    const page = await render(api);
+    page.el.querySelector<HTMLButtonElement>('section.pots .add-button')!.click();
+    await page.fixture.whenStable();
+    expect(page.el.querySelector('dialog #pot-target')).not.toBeNull();
+
+    fill(page.el, { 'pot-name': 'Loan', 'pot-kind': 'LOAN', 'pot-opening-balance': '900' });
+    await page.fixture.whenStable();
+    expect(page.el.querySelector('dialog #pot-target')).toBeNull();
+    page.el.querySelector('dialog form')!.dispatchEvent(new Event('submit'));
+    await page.fixture.whenStable();
+
+    expect(api.pots.at(-1)).toMatchObject({ kind: 'LOAN', target: null, monthlyAmount: null });
   });
 });

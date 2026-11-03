@@ -12,11 +12,13 @@ public record PotResponse(
 		Account account,
 		BigDecimal openingBalance,
 		YearMonth openingMonth,
-		YearMonth archivedFrom) {
+		YearMonth archivedFrom,
+		BigDecimal target,
+		BigDecimal monthlyAmount) {
 
 	static PotResponse from(Pot pot) {
 		return new PotResponse(pot.getId(), pot.getName(), pot.getKind(), pot.getAccount(), pot.getOpeningBalance(),
-				pot.getOpeningMonth(), pot.getArchivedFrom());
+				pot.getOpeningMonth(), pot.getArchivedFrom(), pot.getTarget(), pot.getMonthlyAmount());
 	}
 
 }

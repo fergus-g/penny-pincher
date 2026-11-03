@@ -85,6 +85,56 @@
       </div>
     </div>
 
+    @if (kind() === 'SAVINGS') {
+      <div class="pair">
+        <div class="field">
+          <label for="pot-target">Target <span class="optional">(optional)</span></label>
+          <div class="money">
+            <span aria-hidden="true">€</span>
+            <input
+              id="pot-target"
+              type="number"
+              inputmode="decimal"
+              formControlName="target"
+              min="0.01"
+              step="0.01"
+            />
+          </div>
+          @if (form.controls.target.touched && form.controls.target.invalid) {
+            <small class="error">Enter more than 0, at most 2 decimal places</small>
+          }
+        </div>
+        <div class="field">
+          <label for="pot-monthly">Saving per month</label>
+          <div class="money">
+            <span aria-hidden="true">€</span>
+            <input
+              id="pot-monthly"
+              type="number"
+              inputmode="decimal"
+              formControlName="monthlyAmount"
+              min="0"
+              step="0.01"
+              placeholder="Follows the Allocation"
+              aria-describedby="pot-monthly-hint"
+            />
+          </div>
+          @if (form.controls.monthlyAmount.value !== null) {
+            <button type="button" class="link-button" (click)="followAllocation()">
+              Follow the Allocation instead
+            </button>
+          } @else {
+            <small id="pot-monthly-hint" class="hint"
+              >Left empty, its Contributions plus the Allocation's Savings</small
+            >
+          }
+          @if (form.controls.monthlyAmount.touched && form.controls.monthlyAmount.invalid) {
+            <small class="error">Enter 0 or more, at most 2 decimal places</small>
+          }
+        </div>
+      </div>
+    }
+
     @if (error(); as error) {
       <p class="error" role="alert">{{ error }}</p>
     }
