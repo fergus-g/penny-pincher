@@ -144,3 +144,8 @@ li {
     height: 220px;
   }
 }
+
+/* The card's title sits centred over the pie (the details dialog keeps its own header layout). */
+.card > h2 {
+  text-align: center;
+}
