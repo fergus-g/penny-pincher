@@ -149,23 +149,29 @@
       </div>
     }
 
-    <fieldset>
-      <legend>How often?</legend>
-      <label class="option">
-        <input type="radio" formControlName="oneOff" [value]="false" />
-        <span class="option-text">
-          <span class="option-title">Every month</span>
-          <span class="option-hint">From {{ startLabel() }} onwards</span>
-        </span>
-      </label>
-      <label class="option">
-        <input type="radio" formControlName="oneOff" [value]="true" />
-        <span class="option-text">
-          <span class="option-title">{{ entry() ? 'Just one month' : 'Just this month' }}</span>
-          <span class="option-hint">Only appears in {{ startLabel() }}</span>
-        </span>
-      </label>
-    </fieldset>
+    @if (alwaysRecurring()) {
+      <p class="hint always-recurring">
+        Food and groceries appear every month from {{ startLabel() }}, so they can't be one-off.
+      </p>
+    } @else {
+      <fieldset>
+        <legend>How often?</legend>
+        <label class="option">
+          <input type="radio" formControlName="oneOff" [value]="false" />
+          <span class="option-text">
+            <span class="option-title">Every month</span>
+            <span class="option-hint">From {{ startLabel() }} onwards</span>
+          </span>
+        </label>
+        <label class="option">
+          <input type="radio" formControlName="oneOff" [value]="true" />
+          <span class="option-text">
+            <span class="option-title">{{ entry() ? 'Just one month' : 'Just this month' }}</span>
+            <span class="option-hint">Only appears in {{ startLabel() }}</span>
+          </span>
+        </label>
+      </fieldset>
+    }
 
     @if (entry()) {
       <div class="note" role="note">

@@ -9,9 +9,10 @@ import { monthLabel, paydayWeeks } from '../month-label';
 import {
   Account,
   ACCOUNTS,
+  DEFAULT_ACCOUNT,
   Entry,
   EntryType,
-  DEFAULT_ACCOUNT,
+  isAlwaysRecurring,
   Pot,
   UpdateEntryRequest,
 } from '../month.model';
@@ -116,6 +117,13 @@ export class EntryForm implements OnInit {
   private readonly amount = toSignal(this.form.controls.amount.valueChanges, {
     initialValue: this.form.controls.amount.value,
   });
+  private readonly category = toSignal(this.form.controls.category.valueChanges, {
+    initialValue: this.form.controls.category.value,
+  });
+  /** Food and groceries recur every month, so they get no one-off choice. */
+  protected readonly alwaysRecurring = computed(() =>
+    isAlwaysRecurring(this.type(), this.category() ?? ''),
+  );
   protected readonly weekly = computed(
     () => this.type() === 'EXPENSE' && this.pricing() === 'WEEKLY',
   );
@@ -165,7 +173,7 @@ export class EntryForm implements OnInit {
       weeklyRate: weekly ? amount! : null,
       // Income lands outside the app, so only an Expense has an Account.
       account: this.type() === 'EXPENSE' ? account : null,
-      oneOff,
+      oneOff: oneOff && !isAlwaysRecurring(this.type(), category),
       potId: this.type() === 'EXPENSE' ? potId : null,
       // An empty number input reads as null; Income never has a Due Day.
       dueDay: this.type() === 'EXPENSE' && dueDay !== null ? Number(dueDay) : null,

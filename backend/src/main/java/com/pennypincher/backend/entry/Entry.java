@@ -83,6 +83,19 @@ public class Entry {
 		this.endMonth = endMonth;
 	}
 
+	/**
+	 * Whether an Entry of this type and category must recur every month: food and groceries are
+	 * always needed, so they can't be one-off. Matches any Expense category mentioning food or
+	 * groceries, in any case ("Food", "Groceries", "Food & groceries").
+	 */
+	public static boolean isAlwaysRecurring(EntryType type, String category) {
+		if (type != EntryType.EXPENSE || category == null) {
+			return false;
+		}
+		String key = category.toLowerCase(java.util.Locale.ROOT);
+		return key.contains("food") || key.contains("grocer");
+	}
+
 	/** Started by this month and not ended before it. */
 	public boolean isActiveIn(YearMonth month) {
 		return !this.startMonth.isAfter(month) && (this.endMonth == null || !this.endMonth.isBefore(month));

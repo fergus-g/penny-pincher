@@ -34,6 +34,10 @@ _Avoid_: Due date, payment day
 An Expense priced per week instead of per month. Its amount in a month is the rate times the weeks from the last Thursday of the previous month to the last Thursday of that month (payday to payday), always 4 or 5.
 _Avoid_: Weekly amount, per-week cost
 
+**Food Expense**:
+An Expense whose category mentions food or groceries. Always recurring: it appears every month from its start month and can't be one-off.
+_Avoid_: Essential, staple
+
 **Remainder**:
 Total Income minus total Expenses for a month. Shown to users as "Left over this month".
 _Avoid_: Balance, left over, surplus

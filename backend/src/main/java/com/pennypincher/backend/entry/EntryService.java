@@ -42,7 +42,8 @@ public class EntryService {
 		requireExpenseOnly(request.type(), request.weeklyRate(), "a Weekly Rate");
 		requireExpenseOnly(request.type(), request.dueDay(), "a Due Day");
 		requireValidPot(request.type(), request.potId());
-		YearMonth endMonth = request.oneOff() ? request.startMonth() : null;
+		YearMonth endMonth = (request.oneOff() && !Entry.isAlwaysRecurring(request.type(), request.category()))
+				? request.startMonth() : null;
 		Entry entry = new Entry(request.type(), request.category(), request.name(), request.amount(),
 				request.account(), request.startMonth(), endMonth);
 		entry.setWeeklyRate(request.weeklyRate());
@@ -65,7 +66,8 @@ public class EntryService {
 		entry.setAmount(request.amount());
 		entry.setWeeklyRate(request.weeklyRate());
 		entry.setAccount(request.account());
-		entry.setEndMonth(request.oneOff() ? entry.getStartMonth() : null);
+		entry.setEndMonth((request.oneOff() && !Entry.isAlwaysRecurring(entry.getType(), request.category()))
+				? entry.getStartMonth() : null);
 		entry.setPotId(request.potId());
 		entry.setDueDay(request.dueDay());
 		return response(entry);

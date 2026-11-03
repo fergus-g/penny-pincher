@@ -200,7 +200,10 @@ class FakeMonthApi {
     return of([...new Set(all.filter((e) => e.type === type).map((e) => e.category))].sort());
   }
 
+  lastCreate: CreateEntryRequest | null = null;
+
   createEntry(request: CreateEntryRequest): Observable<Entry> {
+    this.lastCreate = request;
     const created: Entry = {
       ...entry(
         this.nextId++,
@@ -1830,5 +1833,44 @@ describe('MonthPage savings goals', () => {
       return render(new FakeMonthApi());
     })();
     expect(card(empty.el).querySelector('.setup button')!.textContent).toContain('+ Pot');
+  });
+});
+
+describe('Entry form food and groceries', () => {
+  beforeEach(() => {
+    HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
+      this.open = true;
+    };
+    HTMLDialogElement.prototype.close ??= function (this: HTMLDialogElement) {
+      this.open = false;
+    };
+  });
+
+  it('save food and groceries as recurring, with no one-off choice', async () => {
+    const api = new FakeMonthApi();
+    const page = await render(api);
+    page.section('Expenses').querySelector<HTMLButtonElement>('.add-button')!.click();
+    await page.fixture.whenStable();
+    const form = page.el.querySelector('dialog form') as HTMLFormElement;
+    const oneOff = () =>
+      Array.from(form.querySelectorAll<HTMLInputElement>('input[formControlName="oneOff"]'));
+    expect(oneOff()).toHaveLength(2);
+    oneOff()[1].click();
+
+    const category = form.querySelector<HTMLInputElement>('[formControlName="category"]')!;
+    category.value = 'Food & Groceries';
+    category.dispatchEvent(new Event('input'));
+    await page.fixture.whenStable();
+    expect(oneOff()).toHaveLength(0);
+    expect(form.textContent).toContain("so they can't be one-off");
+
+    const amount = form.querySelector<HTMLInputElement>('[formControlName="amount"]')!;
+    amount.value = '400';
+    amount.dispatchEvent(new Event('input'));
+    form.dispatchEvent(new Event('submit'));
+    await page.fixture.whenStable();
+
+    expect(api.months['2026-11'][0]).toMatchObject({ category: 'Food & Groceries' });
+    expect(api.lastCreate!.oneOff).toBe(false);
   });
 });
