@@ -89,3 +89,11 @@ _Avoid_: Payment, deposit
 **Balance Check-in**:
 The actual balance of a Pot in a given month, entered by hand; later months are calculated from it.
 _Avoid_: Adjustment, correction, reconciliation
+
+**Target**:
+The amount a Savings Pot is heading for; optional. A Debt Pot's target is always zero.
+_Avoid_: Goal amount
+
+**Projection**:
+When a Pot reaches its Target at its monthly amount, from the month being viewed. A Savings Pot's monthly amount is its Contributions plus the Allocation's Savings if it's the Allocation's Savings Pot, unless set by hand; a Debt Pot's is its Contributions only. An estimate: interest is ignored.
+_Avoid_: Forecast, goal date
