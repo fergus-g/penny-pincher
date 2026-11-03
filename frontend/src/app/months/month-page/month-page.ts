@@ -11,7 +11,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { AllocationForm } from '../allocation-form/allocation-form';
@@ -112,6 +112,7 @@ const RECENT_CATEGORIES = 6;
     ExpenseChart,
     PaydayCountdown,
     PotForm,
+    RouterLink,
   ],
   selector: 'app-month-page',
   styleUrl: './month-page.scss',
