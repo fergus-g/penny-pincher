@@ -852,3 +852,17 @@ dialog {
     padding: 0 16px;
   }
 }
+
+/* A link styled like the header's text buttons, outlined so it reads as a way out of the month. */
+.trends-link {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+
+  &:hover {
+    background: #f2f4f7;
+  }
+}

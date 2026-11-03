@@ -1704,3 +1704,13 @@ describe('MonthPage projections', () => {
     expect(api.pots.at(-1)).toMatchObject({ kind: 'LOAN', target: null, monthlyAmount: null });
   });
 });
+
+describe('MonthPage header', () => {
+  it('link to the Trends page', async () => {
+    const { el } = await render(new FakeMonthApi());
+    const link = Array.from(el.querySelectorAll('header a')).find((a) =>
+      a.textContent!.includes('Trends'),
+    );
+    expect(link!.getAttribute('href')).toBe('/trends');
+  });
+});

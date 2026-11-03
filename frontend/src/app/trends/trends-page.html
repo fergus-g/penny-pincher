@@ -1,0 +1,104 @@
+<header class="app-header">
+  <div class="header-inner">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">P</span>
+      Penny Pincher
+    </div>
+    <h1>Trends</h1>
+    <a class="text-button" [routerLink]="['/months', current]">Back to this month</a>
+  </div>
+</header>
+
+<main>
+  @if (months.error()) {
+    <p class="message error">Couldn't load the last 12 months. Is the backend running?</p>
+  } @else if (months.hasValue()) {
+    @if (shown().length === 0) {
+      <p class="message">Nothing to show yet: add some Income and Expenses first.</p>
+    } @else {
+      <section class="card" aria-labelledby="totals-title">
+        <h2 id="totals-title">Income, Expenses and Remainder</h2>
+        <div class="chart">
+          <canvas
+            baseChart
+            type="bar"
+            [data]="totalsData()"
+            [options]="barOptions"
+            role="img"
+            aria-label="Income, Expenses and Remainder per month; figures in the table below"
+          ></canvas>
+        </div>
+        <details>
+          <summary>Show the figures</summary>
+          <table class="figures totals-table">
+            <thead>
+              <tr>
+                <th scope="col">Month</th>
+                <th scope="col">Income</th>
+                <th scope="col">Expenses</th>
+                <th scope="col">Remainder</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (month of shown(); track month.month) {
+                <tr>
+                  <th scope="row">{{ monthLabel(month.month) }}</th>
+                  <td>{{ month.totalIncome | currency: 'EUR' }}</td>
+                  <td>{{ month.totalExpenses | currency: 'EUR' }}</td>
+                  <td [class.negative]="month.remainder < 0">
+                    {{ month.remainder | currency: 'EUR' }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </details>
+      </section>
+
+      <section class="card" aria-labelledby="pots-title">
+        <h2 id="pots-title">Pots</h2>
+        @if (potLines().length === 0) {
+          <p class="hint">No Pots yet. Add one from the month view to track it here.</p>
+        } @else {
+          <div class="chart">
+            <canvas
+              baseChart
+              type="line"
+              [data]="potData()"
+              [options]="lineOptions"
+              role="img"
+              aria-label="Each Pot's balance per month, debts below zero; figures in the table below"
+            ></canvas>
+          </div>
+          <details>
+            <summary>Show the figures</summary>
+            <table class="figures pots-table">
+              <thead>
+                <tr>
+                  <th scope="col">Month</th>
+                  @for (line of potLines(); track line.id) {
+                    <th scope="col">{{ line.name }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (month of shown(); track month.month; let i = $index) {
+                  <tr>
+                    <th scope="row">{{ monthLabel(month.month) }}</th>
+                    @for (line of potLines(); track line.id) {
+                      <td [class.negative]="(line.values[i] ?? 0) < 0">
+                        {{ line.values[i] === null ? '–' : (line.values[i] | currency: 'EUR') }}
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </details>
+        }
+      </section>
+    }
+  } @else {
+    <p class="message">Loading…</p>
+  }
+</main>

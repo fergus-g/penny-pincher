@@ -9,7 +9,15 @@ import { CategoryTotal } from '../month.model';
  * Categorical colours in fixed order, so a category's colour follows its rank this month.
  * Validated for colour-blind separation between neighbouring slices.
  */
-const COLOURS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6'];
+export const COLOURS = [
+  '#2a78d6',
+  '#eb6834',
+  '#1baf7a',
+  '#eda100',
+  '#e87ba4',
+  '#008300',
+  '#6250d6',
+];
 /** Everything past the coloured slices folds into one grey "Other" slice. */
 const OTHER_COLOUR = '#9aa1ab';
 
