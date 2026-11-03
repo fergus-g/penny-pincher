@@ -47,6 +47,17 @@ public class Pot {
 	@Column(name = "opening_month", nullable = false)
 	private YearMonth openingMonth;
 
+	/** A Savings Pot's target; null for none, and always for a debt. */
+	@Column(precision = 12, scale = 2)
+	private BigDecimal target;
+
+	/**
+	 * A Savings Pot's monthly amount set by hand, used in its Projection instead of its
+	 * Contributions plus the Allocation's Savings; null to follow those.
+	 */
+	@Column(name = "monthly_amount", precision = 12, scale = 2)
+	private BigDecimal monthlyAmount;
+
 	/** Hidden from this month onwards; null while in use. */
 	@Convert(converter = YearMonthConverter.class)
 	@Column(name = "archived_from")
@@ -114,6 +125,22 @@ public class Pot {
 
 	public void setArchivedFrom(YearMonth archivedFrom) {
 		this.archivedFrom = archivedFrom;
+	}
+
+	public BigDecimal getTarget() {
+		return this.target;
+	}
+
+	public void setTarget(BigDecimal target) {
+		this.target = target;
+	}
+
+	public BigDecimal getMonthlyAmount() {
+		return this.monthlyAmount;
+	}
+
+	public void setMonthlyAmount(BigDecimal monthlyAmount) {
+		this.monthlyAmount = monthlyAmount;
 	}
 
 }

@@ -58,7 +58,28 @@ export class PotForm implements OnInit {
       Validators.pattern(/^\d+(\.\d{1,2})?$/),
     ]),
     openingMonth: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    // Savings Pots only.
+    target: new FormControl<number | null>(null, [
+      Validators.min(0.01),
+      Validators.pattern(/^\d+(\.\d{1,2})?$/),
+    ]),
+    monthlyAmount: new FormControl<number | null>(null, [
+      Validators.min(0),
+      Validators.pattern(/^\d+(\.\d{1,2})?$/),
+    ]),
   });
+
+  /** The kind picked, so the savings-only fields come and go with it. */
+  protected readonly kind = signal<PotKind>('SAVINGS');
+
+  constructor() {
+    this.form.controls.kind.valueChanges.subscribe((kind) => this.kind.set(kind));
+  }
+
+  /** Clears an edited monthly amount, so it follows the Contributions and the Allocation again. */
+  protected followAllocation(): void {
+    this.form.controls.monthlyAmount.setValue(null);
+  }
 
   ngOnInit(): void {
     const pot = this.pot();
@@ -69,7 +90,10 @@ export class PotForm implements OnInit {
         account: pot.account,
         openingBalance: pot.openingBalance,
         openingMonth: pot.openingMonth,
+        target: pot.target,
+        monthlyAmount: pot.monthlyAmount,
       });
+      this.kind.set(pot.kind);
       // A Pot is permanently savings or a debt.
       this.form.controls.kind.disable();
     } else {
@@ -90,13 +114,18 @@ export class PotForm implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
-    const { name, kind, account, openingBalance, openingMonth } = this.form.getRawValue();
+    const { name, kind, account, openingBalance, openingMonth, target, monthlyAmount } =
+      this.form.getRawValue();
+    // An empty number input reads as null; a debt never has either.
+    const savings = kind === 'SAVINGS';
     const body: UpdatePotRequest = {
       name: name.trim(),
       account,
       openingBalance: openingBalance!,
       openingMonth,
       archivedFrom,
+      target: savings ? (target ?? null) : null,
+      monthlyAmount: savings ? (monthlyAmount ?? null) : null,
     };
     const pot = this.pot();
     const request: Observable<unknown> = pot
@@ -107,6 +136,8 @@ export class PotForm implements OnInit {
           account,
           openingBalance: body.openingBalance,
           openingMonth,
+          target: body.target,
+          monthlyAmount: body.monthlyAmount,
         });
     this.saving.set(true);
     this.error.set(null);

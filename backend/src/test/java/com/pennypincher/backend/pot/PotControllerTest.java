@@ -38,7 +38,7 @@ class PotControllerTest {
 	@Test
 	void createReturns201WithPot() {
 		given(this.potService.create(any(CreatePotRequest.class))).willReturn(new PotResponse(1L, "Car loan",
-				PotKind.LOAN, Account.AIB, new BigDecimal("5000.00"), JAN, null));
+				PotKind.LOAN, Account.AIB, new BigDecimal("5000.00"), JAN, null, null, null));
 		assertThat(this.mvc.post().uri("/api/pots").contentType(MediaType.APPLICATION_JSON).content("""
 				{"name":"Car loan","kind":"LOAN","account":"AIB","openingBalance":5000,"openingMonth":"2026-01"}
 				""")).hasStatus(HttpStatus.CREATED).bodyJson().isLenientlyEqualTo("""

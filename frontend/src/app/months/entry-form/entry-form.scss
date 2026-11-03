@@ -348,3 +348,14 @@ fieldset.pricing {
     grid-template-columns: 1fr;
   }
 }
+
+/* A small text action under a field, e.g. the Pot form's "Follow the Allocation instead". */
+.link-button {
+  align-self: flex-start;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--income);
+  font-size: 13px;
+  text-decoration: underline;
+}

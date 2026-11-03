@@ -1,5 +1,6 @@
 package com.pennypincher.backend.pot;
 
+import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.List;
 
@@ -38,14 +39,18 @@ public class PotService {
 
 	@Transactional
 	public PotResponse create(CreatePotRequest request) {
+		requireSavingsOnly(request.kind(), request.target(), request.monthlyAmount());
 		Pot pot = new Pot(request.name(), request.kind(), request.account(), request.openingBalance(),
 				request.openingMonth());
+		pot.setTarget(request.target());
+		pot.setMonthlyAmount(request.monthlyAmount());
 		return PotResponse.from(this.potRepository.save(pot));
 	}
 
 	@Transactional
 	public PotResponse update(Long id, UpdatePotRequest request) {
 		Pot pot = findPot(id);
+		requireSavingsOnly(pot.getKind(), request.target(), request.monthlyAmount());
 		if (request.archivedFrom() != null && request.archivedFrom().isBefore(request.openingMonth())) {
 			throw badRequest("A Pot can't be archived before its opening month");
 		}
@@ -58,6 +63,8 @@ public class PotService {
 		pot.setOpeningBalance(request.openingBalance());
 		pot.setOpeningMonth(request.openingMonth());
 		pot.setArchivedFrom(request.archivedFrom());
+		pot.setTarget(request.target());
+		pot.setMonthlyAmount(request.monthlyAmount());
 		return PotResponse.from(pot);
 	}
 
@@ -100,6 +107,13 @@ public class PotService {
 	public void requireExists(Long potId) {
 		if (!this.potRepository.existsById(potId)) {
 			throw badRequest("Pot " + potId + " not found");
+		}
+	}
+
+	/** A Debt Pot's target is always zero, and what pays it down is its Contributions. */
+	private static void requireSavingsOnly(PotKind kind, BigDecimal target, BigDecimal monthlyAmount) {
+		if (kind.isDebt() && (target != null || monthlyAmount != null)) {
+			throw badRequest("Only a Savings Pot can have a target or a monthly amount");
 		}
 	}
 

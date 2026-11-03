@@ -66,6 +66,35 @@ const SECTION = {
 
 const euros = new Intl.NumberFormat('en', { style: 'currency', currency: 'EUR' });
 
+/** Whole euros where there are no cents: "€5,000", "€150.50". */
+const roundEuros = (amount: number) => euros.format(amount).replace(/\.00$/, '');
+
+/**
+ * Where a Pot is heading, e.g. "Target €5,000 · €200/month · reached Jun 2027" or
+ * "€150/month · debt-free Mar 2028"; null for a Savings Pot with no target.
+ */
+export function projectionLabel(pot: PotBalance): string | null {
+  const projection = pot.projection;
+  if (!projection) {
+    return null;
+  }
+  const debt = isDebt(pot.kind);
+  const target = debt ? null : `Target ${roundEuros(projection.target)}`;
+  if (projection.reached) {
+    return debt ? 'Paid off' : `${target} reached`;
+  }
+  const parts = [target];
+  if (projection.reachedIn === null) {
+    parts.push('No date: nothing going in');
+  } else {
+    parts.push(
+      `${roundEuros(projection.monthly)}/month`,
+      `${debt ? 'debt-free' : 'reached'} ${monthLabel(projection.reachedIn, 'short')}`,
+    );
+  }
+  return parts.filter((part) => part !== null).join(' · ');
+}
+
 /** How many Entry rows a section shows before its list scrolls; matches the CSS. */
 const MAX_ROWS = 5;
 
@@ -231,6 +260,7 @@ export class MonthPage {
       pot,
       shown: isDebt(pot.kind) ? -pot.balance : pot.balance,
       meta: `${potKindLabel(pot.kind)} · ${accountLabel(pot.account)}`,
+      projection: projectionLabel(pot),
     })),
   );
 
